@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "GlassyStart",
+  "version": "1.0.0",
+  "description": "A beautiful glass-morphism new tab page",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://corsproxy.io/*"
+  ]
+}

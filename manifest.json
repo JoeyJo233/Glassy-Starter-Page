@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "GlassyStart",
+  "version": "1.0",
+  "description": "我的专属浏览器主页",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://suggestqueries.google.com/*",
+    "https://api.bing.com/*",
+    "https://duckduckgo.com/*",
+    "https://yandex.com/*"
+  ],
+  "action": {
+    "default_icon": "vite.svg"
+  }
+}
