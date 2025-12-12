@@ -31,6 +31,74 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
+  // Modal Width Resize State
+  const MIN_MODAL_WIDTH = 320;
+  const MAX_MODAL_WIDTH = 800;
+  const DEFAULT_MODAL_WIDTH = 420;
+  
+  const [modalWidth, setModalWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('settingsModalWidth');
+      return saved ? Math.max(MIN_MODAL_WIDTH, Math.min(MAX_MODAL_WIDTH, parseInt(saved))) : DEFAULT_MODAL_WIDTH;
+    } catch (e) {
+      return DEFAULT_MODAL_WIDTH;
+    }
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+
+  // Save modal width to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('settingsModalWidth', modalWidth.toString());
+    } catch (e) {
+      console.warn("LocalStorage full or disabled", e);
+    }
+  }, [modalWidth]);
+
+  // Modal Resize Logic
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      e.preventDefault();
+      
+      // Calculate new width (dragging left edge, so width increases when moving left)
+      const deltaX = resizeStartX.current - e.clientX;
+      let newWidth = resizeStartWidth.current + deltaX;
+      
+      // Clamp to min/max
+      newWidth = Math.max(MIN_MODAL_WIDTH, Math.min(MAX_MODAL_WIDTH, newWidth));
+      setModalWidth(newWidth);
+    };
+
+    const handleResizeUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (isResizing) {
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleResizeMove);
+      window.removeEventListener('mouseup', handleResizeUp);
+    };
+  }, [isResizing]);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = modalWidth;
+  };
+
   // Custom Wallpapers State
   const [customWallpapers, setCustomWallpapers] = useState<string[]>(() => {
     try {
@@ -354,10 +422,21 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
 
       {/* 设置侧边栏 - 从右侧滑出 */}
       <div 
-        className={`fixed top-0 right-0 h-full w-[420px] bg-white/95 backdrop-blur-xl shadow-2xl transition-transform duration-300 ease-out z-50 ${
+        className={`fixed top-0 right-0 h-full bg-white/95 backdrop-blur-xl shadow-2xl transition-transform duration-300 ease-out z-50 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        style={{ width: `${modalWidth}px` }}
       >
+        {/* 左侧拖拽调整大小手柄 */}
+        <div
+          className="absolute left-0 top-0 w-2 h-full cursor-ew-resize group z-50"
+          onMouseDown={handleResizeStart}
+        >
+          {/* 视觉指示条 */}
+          <div className="absolute left-0 top-0 w-1 h-full bg-transparent group-hover:bg-blue-400/50 transition-colors" />
+          {/* 中间拖拽指示器 */}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-gray-300 group-hover:bg-blue-500 rounded-r-full opacity-0 group-hover:opacity-100 transition-all" />
+        </div>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-5 border-b border-gray-200/50">
             <h2 className="text-xl font-semibold text-gray-800">Settings</h2>
