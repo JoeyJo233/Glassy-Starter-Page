@@ -594,6 +594,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             <div className="space-y-5">
                 <div>
                     <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                        <label>Global Scale</label>
+                        <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
+                    </div>
+                    <input
+                    type="range"
+                    min="50"
+                    max="150"
+                    value={settings.globalScale ?? 100}
+                    onChange={(e) => onSave({...settings, globalScale: parseInt(e.target.value)})}
+                    className="w-full"
+                    />
+                </div>
+                <div>
+                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
                         <label>Overlay Opacity</label>
                         <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
                     </div>

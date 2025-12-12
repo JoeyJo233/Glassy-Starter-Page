@@ -34,6 +34,7 @@ export interface AppSettings {
   dateOffsetY: number; // -100 to 200 - 日期纵向偏移 (px)
   searchBarOffsetY: number; // -100 to 200 - 搜索栏纵向偏移 (px)
   shortcutsOffsetY: number; // -100 to 200 - 快捷方式纵向偏移 (px)
+  globalScale: number; // 50 to 150 - 全局缩放百分比
   textColor?: string; // Auto-calculated based on background
 }
 

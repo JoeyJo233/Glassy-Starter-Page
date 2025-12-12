@@ -24,7 +24,8 @@ const App: React.FC = () => {
     timeOffsetY: 0,
     dateOffsetY: -20,
     searchBarOffsetY: -20,
-    shortcutsOffsetY: -20
+    shortcutsOffsetY: -20,
+    globalScale: 100
   });
 
   // State: Settings
@@ -187,7 +188,10 @@ const App: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="z-10 w-full flex flex-col items-center px-4">
+      <div 
+        className="z-10 w-full flex flex-col items-center px-4 origin-top transition-transform duration-300"
+        style={{ transform: `scale(${(settings.globalScale ?? 100) / 100})` }}
+      >
         <Clock 
           timeFontSize={settings.timeFontSize}
           dateFontSize={settings.dateFontSize}
