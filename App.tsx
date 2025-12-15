@@ -66,65 +66,6 @@ const App: React.FC = () => {
   const [editItem, setEditItem] = useState<{item: BookmarkItem | null, parentId?: string} | null>(null);
   const [openFolder, setOpenFolder] = useState<BookmarkItem | null>(null);
 
-  // Calculate text color based on background image
-  useEffect(() => {
-    const calculateTextColor = () => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = settings.backgroundImage;
-      
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-
-          // Sample from center of image
-          canvas.width = 100;
-          canvas.height = 100;
-          ctx.drawImage(img, 0, 0, 100, 100);
-          
-          // Get average color from center region
-          const imageData = ctx.getImageData(0, 0, 100, 100);
-          let r = 0, g = 0, b = 0;
-          const pixels = imageData.data.length / 4;
-          
-          for (let i = 0; i < imageData.data.length; i += 4) {
-            r += imageData.data[i];
-            g += imageData.data[i + 1];
-            b += imageData.data[i + 2];
-          }
-          
-          r = r / pixels / 255;
-          g = g / pixels / 255;
-          b = b / pixels / 255;
-          
-          // Calculate luminance
-          const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-          
-          // Adjust for opacity overlay
-          const adjustedLuminance = luminance * (1 - settings.opacityLevel / 100);
-          
-          // Choose text color
-          const textColor = adjustedLuminance > 0.4 ? 'rgb(31, 41, 55)' : 'rgb(243, 244, 246)';
-          
-          setSettings(prev => ({ ...prev, textColor }));
-        } catch (e) {
-          console.error('Failed to calculate text color:', e);
-          // Fallback to light text
-          setSettings(prev => ({ ...prev, textColor: 'rgb(243, 244, 246)' }));
-        }
-      };
-      
-      img.onerror = () => {
-        // Fallback to light text if image fails to load
-        setSettings(prev => ({ ...prev, textColor: 'rgb(243, 244, 246)' }));
-      };
-    };
-
-    calculateTextColor();
-  }, [settings.backgroundImage, settings.opacityLevel]);
-
   // Persistence Effects - wrap with try/catch to avoid crashes (especially for large base64 wallpapers)
   useEffect(() => {
     try {
@@ -247,7 +188,6 @@ const App: React.FC = () => {
           dateFontSize={settings.dateFontSize}
           timeOffsetY={settings.timeOffsetY}
           dateOffsetY={settings.dateOffsetY}
-          textColor={settings.textColor}
         />
 
         <SearchBar
@@ -258,7 +198,6 @@ const App: React.FC = () => {
           searchBarOpacity={settings.searchBarOpacity}
           searchBarBlur={settings.searchBarBlur}
           searchBarOffsetY={settings.searchBarOffsetY}
-          textColor={settings.textColor}
         />
 
         <BookmarkGrid
@@ -269,7 +208,6 @@ const App: React.FC = () => {
           onDeleteItem={handleDeleteItem}
           onAddItem={handleAddItem}
           offsetY={settings.shortcutsOffsetY}
-          textColor={settings.textColor}
         />
       </div>
 
