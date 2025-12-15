@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Upload, Trash2, Check, Image as ImageIcon, RotateCcw, Download } from 'lucide-react';
-import { AppSettings } from '../types';
+import { X, Upload, Trash2, Check, Image as ImageIcon, RotateCcw, Download, FileDown, FileUp } from 'lucide-react';
+import { AppSettings, SearchEngineId, BookmarkItem } from '../types';
 import { WallpaperWithURL } from '../utils/wallpaperStore';
+import { exportBookmarks, importBookmarks, exportSettings, importSettings } from '../utils/backup';
 
 // 默认设置值（需要与 App.tsx 中的 getDefaultSettings 保持一致）
 const DEFAULT_SETTINGS: Partial<AppSettings> = {
@@ -26,6 +27,10 @@ interface SettingsModalProps {
   settings: AppSettings;
   onSave: (settings: AppSettings) => void;
   onResetDefaults: () => void;
+  bookmarks: BookmarkItem[];
+  currentEngine: SearchEngineId;
+  onRestoreBookmarks: (bookmarks: BookmarkItem[]) => void;
+  onRestoreSettings: (settings: Partial<AppSettings>, engine: SearchEngineId) => void;
 }
 
 const PRESET_BACKGROUNDS = [
@@ -45,7 +50,17 @@ interface CropState {
 
 type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave, onResetDefaults }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  settings, 
+  onSave, 
+  onResetDefaults,
+  bookmarks,
+  currentEngine,
+  onRestoreBookmarks,
+  onRestoreSettings
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -139,6 +154,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const [customWallpapers, setCustomWallpapers] = useState<WallpaperWithURL[]>([]);
   const [isLoadingWallpapers, setIsLoadingWallpapers] = useState(false);
   const [pendingWallpaperName, setPendingWallpaperName] = useState('wallpaper');
+
+  // Backup/Restore State
+  const bookmarksFileInputRef = useRef<HTMLInputElement>(null);
+  const settingsFileInputRef = useRef<HTMLInputElement>(null);
 
   // Cropping State
   const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
@@ -408,6 +427,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
 
   const handleCancelCrop = () => {
     setTempImageSrc(null);
+  };
+
+  // Backup/Restore Handlers
+  const handleExportBookmarks = () => {
+    exportBookmarks(bookmarks);
+  };
+
+  const handleImportBookmarks = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    importBookmarks(file)
+      .then((bookmarks) => {
+        onRestoreBookmarks(bookmarks);
+        alert('Bookmarks restored successfully!');
+        if (bookmarksFileInputRef.current) {
+          bookmarksFileInputRef.current.value = '';
+        }
+      })
+      .catch((error) => {
+        alert(`Failed to restore bookmarks: ${error.message}`);
+      });
+  };
+
+  const handleExportSettings = () => {
+    exportSettings(settings, currentEngine);
+  };
+
+  const handleImportSettings = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    importSettings(file)
+      .then(({ settings: importedSettings, currentEngine: importedEngine }) => {
+        onRestoreSettings(importedSettings, importedEngine);
+        alert('Settings restored successfully!');
+        if (settingsFileInputRef.current) {
+          settingsFileInputRef.current.value = '';
+        }
+      })
+      .catch((error) => {
+        alert(`Failed to restore settings: ${error.message}`);
+      });
   };
 
   if (!isOpen) return null;
@@ -990,6 +1052,79 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     className="w-full"
                     />
                   </div>
+            </div>
+
+            <hr className="border-gray-200" />
+
+            {/* Backup & Restore Section */}
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold text-gray-800 mb-3">Backup & Restore</h3>
+              
+              {/* Bookmarks Backup/Restore */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">Bookmarks</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Export or import all shortcuts and folders</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportBookmarks}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => bookmarksFileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4" />
+                    Import
+                  </button>
+                  <input
+                    ref={bookmarksFileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportBookmarks}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Settings Backup/Restore */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">Settings</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Export or import all settings (wallpaper excluded)</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportSettings}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => settingsFileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4" />
+                    Import
+                  </button>
+                  <input
+                    ref={settingsFileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportSettings}
+                    className="hidden"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

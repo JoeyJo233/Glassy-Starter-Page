@@ -44,3 +44,17 @@ export interface DragItem {
   type: ItemType;
   folderId?: string; // If inside a folder
 }
+
+// Backup types
+export interface BookmarksBackup {
+  version: string;
+  timestamp: number;
+  bookmarks: BookmarkItem[];
+}
+
+export interface SettingsBackup {
+  version: string;
+  timestamp: number;
+  settings: Omit<AppSettings, 'backgroundImage' | 'backgroundImageId'>;
+  currentEngine: SearchEngineId;
+}

@@ -242,7 +242,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
       {/* Suggestions / History Dropdown */}
       {showDropdown && (
-        <div className="absolute top-16 left-0 w-full bg-white/80 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/40 overflow-hidden py-2">
+        <div
+      className="absolute top-16 left-0 w-full bg-white/80 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/40 overflow-hidden py-2"
+          style={{
+            transform: `translateY(${searchBarOffsetY}px)`,
+          }}
+        >
             {/* History Section (Only when query is empty) */}
             {query === '' && displayHistory.map((item, idx) => (
                 <div

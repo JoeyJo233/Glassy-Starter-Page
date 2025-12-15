@@ -51,6 +51,22 @@ const App: React.FC = () => {
     setSettings(defaults);
   };
 
+  const handleRestoreBookmarks = (bookmarks: BookmarkItem[]) => {
+    setItems(bookmarks);
+  };
+
+  const handleRestoreSettings = (importedSettings: Partial<AppSettings>, engine: SearchEngineId) => {
+    // Merge imported settings with current wallpaper settings
+    setSettings(prev => ({
+      ...prev,
+      ...importedSettings,
+      // Keep current wallpaper
+      backgroundImage: prev.backgroundImage,
+      backgroundImageId: prev.backgroundImageId
+    }));
+    setCurrentEngineId(engine);
+  };
+
   // State: Data
   const [items, setItems] = useState<BookmarkItem[]>(() => {
     const saved = localStorage.getItem('bookmarks');
@@ -226,6 +242,10 @@ const App: React.FC = () => {
         settings={settings}
         onSave={setSettings}
         onResetDefaults={handleResetSettings}
+        bookmarks={items}
+        currentEngine={currentEngineId}
+        onRestoreBookmarks={handleRestoreBookmarks}
+        onRestoreSettings={handleRestoreSettings}
       />
 
       <EditItemModal
