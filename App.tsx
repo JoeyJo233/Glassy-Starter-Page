@@ -13,6 +13,7 @@ import FolderView from './components/FolderView';
 const App: React.FC = () => {
   const getDefaultSettings = (): AppSettings => ({
     backgroundImage: DEFAULT_BACKGROUND,
+    backgroundImageId: undefined,
     blurLevel: 0,
     opacityLevel: 25,
     maxHistoryItems: 5,
@@ -50,6 +51,22 @@ const App: React.FC = () => {
     setSettings(defaults);
   };
 
+  const handleRestoreBookmarks = (bookmarks: BookmarkItem[]) => {
+    setItems(bookmarks);
+  };
+
+  const handleRestoreSettings = (importedSettings: Partial<AppSettings>, engine: SearchEngineId) => {
+    // Merge imported settings with current wallpaper settings
+    setSettings(prev => ({
+      ...prev,
+      ...importedSettings,
+      // Keep current wallpaper
+      backgroundImage: prev.backgroundImage,
+      backgroundImageId: prev.backgroundImageId
+    }));
+    setCurrentEngineId(engine);
+  };
+
   // State: Data
   const [items, setItems] = useState<BookmarkItem[]>(() => {
     const saved = localStorage.getItem('bookmarks');
@@ -65,69 +82,59 @@ const App: React.FC = () => {
   const [editItem, setEditItem] = useState<{item: BookmarkItem | null, parentId?: string} | null>(null);
   const [openFolder, setOpenFolder] = useState<BookmarkItem | null>(null);
 
-  // Calculate text color based on background image
+  // Persistence Effects - wrap with try/catch to avoid crashes (especially for large base64 wallpapers)
   useEffect(() => {
-    const calculateTextColor = () => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = settings.backgroundImage;
-      
-      img.onload = () => {
+    try {
+      localStorage.setItem('appSettings', JSON.stringify(settings));
+    } catch (e) {
+      console.warn('Failed to persist appSettings (possibly quota exceeded).', e);
+      // Fallback: try to persist without backgroundImage if it is a large data URL
+      if (settings.backgroundImage?.startsWith('data:')) {
         try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-
-          // Sample from center of image
-          canvas.width = 100;
-          canvas.height = 100;
-          ctx.drawImage(img, 0, 0, 100, 100);
-          
-          // Get average color from center region
-          const imageData = ctx.getImageData(0, 0, 100, 100);
-          let r = 0, g = 0, b = 0;
-          const pixels = imageData.data.length / 4;
-          
-          for (let i = 0; i < imageData.data.length; i += 4) {
-            r += imageData.data[i];
-            g += imageData.data[i + 1];
-            b += imageData.data[i + 2];
-          }
-          
-          r = r / pixels / 255;
-          g = g / pixels / 255;
-          b = b / pixels / 255;
-          
-          // Calculate luminance
-          const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-          
-          // Adjust for opacity overlay
-          const adjustedLuminance = luminance * (1 - settings.opacityLevel / 100);
-          
-          // Choose text color
-          const textColor = adjustedLuminance > 0.4 ? 'rgb(31, 41, 55)' : 'rgb(243, 244, 246)';
-          
-          setSettings(prev => ({ ...prev, textColor }));
-        } catch (e) {
-          console.error('Failed to calculate text color:', e);
-          // Fallback to light text
-          setSettings(prev => ({ ...prev, textColor: 'rgb(243, 244, 246)' }));
+          const { backgroundImage, ...rest } = settings;
+          localStorage.setItem('appSettings', JSON.stringify(rest));
+          console.warn('Persisted appSettings without backgroundImage to avoid quota issues.');
+        } catch (err) {
+          console.warn('Fallback persistence for appSettings also failed.', err);
         }
-      };
-      
-      img.onerror = () => {
-        // Fallback to light text if image fails to load
-        setSettings(prev => ({ ...prev, textColor: 'rgb(243, 244, 246)' }));
-      };
+      }
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bookmarks', JSON.stringify(items));
+    } catch (e) {
+      console.warn('Failed to persist bookmarks.', e);
+    }
+  }, [items]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('currentEngine', currentEngineId);
+    } catch (e) {
+      console.warn('Failed to persist currentEngine.', e);
+    }
+  }, [currentEngineId]);
+
+  // Resolve custom wallpaper from IndexedDB when backgroundImageId is present
+  useEffect(() => {
+    const resolveCustomWallpaper = async () => {
+      if (!settings.backgroundImageId) return;
+      // If already a blob URL, skip
+      if (settings.backgroundImage && settings.backgroundImage.startsWith('blob:')) return;
+      try {
+        const { getWallpaperBlob } = await import('./utils/wallpaperStore');
+        const blob = await getWallpaperBlob(settings.backgroundImageId);
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        setSettings(prev => ({ ...prev, backgroundImage: url }));
+      } catch (e) {
+        console.warn('Failed to resolve custom wallpaper from IndexedDB', e);
+      }
     };
-
-    calculateTextColor();
-  }, [settings.backgroundImage, settings.opacityLevel]);
-
-  // Persistence Effects
-  useEffect(() => localStorage.setItem('appSettings', JSON.stringify(settings)), [settings]);
-  useEffect(() => localStorage.setItem('bookmarks', JSON.stringify(items)), [items]);
-  useEffect(() => localStorage.setItem('currentEngine', currentEngineId), [currentEngineId]);
+    resolveCustomWallpaper();
+  }, [settings.backgroundImageId]);
 
   // Handlers
   const handleAddItem = () => {
@@ -197,7 +204,6 @@ const App: React.FC = () => {
           dateFontSize={settings.dateFontSize}
           timeOffsetY={settings.timeOffsetY}
           dateOffsetY={settings.dateOffsetY}
-          textColor={settings.textColor}
         />
 
         <SearchBar
@@ -208,7 +214,6 @@ const App: React.FC = () => {
           searchBarOpacity={settings.searchBarOpacity}
           searchBarBlur={settings.searchBarBlur}
           searchBarOffsetY={settings.searchBarOffsetY}
-          textColor={settings.textColor}
         />
 
         <BookmarkGrid
@@ -219,7 +224,6 @@ const App: React.FC = () => {
           onDeleteItem={handleDeleteItem}
           onAddItem={handleAddItem}
           offsetY={settings.shortcutsOffsetY}
-          textColor={settings.textColor}
         />
       </div>
 
@@ -238,6 +242,10 @@ const App: React.FC = () => {
         settings={settings}
         onSave={setSettings}
         onResetDefaults={handleResetSettings}
+        bookmarks={items}
+        currentEngine={currentEngineId}
+        onRestoreBookmarks={handleRestoreBookmarks}
+        onRestoreSettings={handleRestoreSettings}
       />
 
       <EditItemModal

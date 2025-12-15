@@ -22,6 +22,7 @@ export interface BookmarkItem {
 
 export interface AppSettings {
   backgroundImage: string;
+  backgroundImageId?: string; // IndexedDB id for custom wallpapers
   blurLevel: number; // 0 to 20
   opacityLevel: number; // 0 to 100
   maxHistoryItems: number;
@@ -35,7 +36,6 @@ export interface AppSettings {
   searchBarOffsetY: number; // -100 to 200 - 搜索栏纵向偏移 (px)
   shortcutsOffsetY: number; // -100 to 200 - 快捷方式纵向偏移 (px)
   globalScale: number; // 50 to 150 - 全局缩放百分比
-  textColor?: string; // Auto-calculated based on background
 }
 
 export interface DragItem {
@@ -43,4 +43,18 @@ export interface DragItem {
   index: number;
   type: ItemType;
   folderId?: string; // If inside a folder
+}
+
+// Backup types
+export interface BookmarksBackup {
+  version: string;
+  timestamp: number;
+  bookmarks: BookmarkItem[];
+}
+
+export interface SettingsBackup {
+  version: string;
+  timestamp: number;
+  settings: Omit<AppSettings, 'backgroundImage' | 'backgroundImageId'>;
+  currentEngine: SearchEngineId;
 }

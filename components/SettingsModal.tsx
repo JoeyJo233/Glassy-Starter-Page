@@ -1,6 +1,25 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Upload, Trash2, Check, Image as ImageIcon } from 'lucide-react';
-import { AppSettings } from '../types';
+import { X, Upload, Trash2, Check, Image as ImageIcon, RotateCcw, Download, FileDown, FileUp } from 'lucide-react';
+import { AppSettings, SearchEngineId, BookmarkItem } from '../types';
+import { WallpaperWithURL } from '../utils/wallpaperStore';
+import { exportBookmarks, importBookmarks, exportSettings, importSettings } from '../utils/backup';
+
+// 默认设置值（需要与 App.tsx 中的 getDefaultSettings 保持一致）
+const DEFAULT_SETTINGS: Partial<AppSettings> = {
+  blurLevel: 0,
+  opacityLevel: 25,
+  maxHistoryItems: 5,
+  maxSuggestions: 5,
+  searchBarOpacity: 55,
+  searchBarBlur: 24,
+  timeFontSize: 110,
+  dateFontSize: 22,
+  timeOffsetY: 0,
+  dateOffsetY: -20,
+  searchBarOffsetY: -20,
+  shortcutsOffsetY: -20,
+  globalScale: 100,
+};
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -8,6 +27,10 @@ interface SettingsModalProps {
   settings: AppSettings;
   onSave: (settings: AppSettings) => void;
   onResetDefaults: () => void;
+  bookmarks: BookmarkItem[];
+  currentEngine: SearchEngineId;
+  onRestoreBookmarks: (bookmarks: BookmarkItem[]) => void;
+  onRestoreSettings: (settings: Partial<AppSettings>, engine: SearchEngineId) => void;
 }
 
 const PRESET_BACKGROUNDS = [
@@ -27,7 +50,17 @@ interface CropState {
 
 type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave, onResetDefaults }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  settings, 
+  onSave, 
+  onResetDefaults,
+  bookmarks,
+  currentEngine,
+  onRestoreBookmarks,
+  onRestoreSettings
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -47,6 +80,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const [isResizing, setIsResizing] = useState(false);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+
+  // Load wallpapers from IndexedDB when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    const load = async () => {
+      setIsLoadingWallpapers(true);
+      try {
+        const { listWallpapers } = await import('../utils/wallpaperStore');
+        const list = await listWallpapers();
+        setCustomWallpapers(list);
+      } catch (e) {
+        console.warn('Failed to load wallpapers', e);
+      } finally {
+        setIsLoadingWallpapers(false);
+      }
+    };
+    load();
+  }, [isOpen]);
 
   // Save modal width to localStorage
   useEffect(() => {
@@ -99,23 +150,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     resizeStartWidth.current = modalWidth;
   };
 
-  // Custom Wallpapers State
-  const [customWallpapers, setCustomWallpapers] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('customWallpapers');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // Custom Wallpapers State (IndexedDB)
+  const [customWallpapers, setCustomWallpapers] = useState<WallpaperWithURL[]>([]);
+  const [isLoadingWallpapers, setIsLoadingWallpapers] = useState(false);
+  const [pendingWallpaperName, setPendingWallpaperName] = useState('wallpaper');
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('customWallpapers', JSON.stringify(customWallpapers));
-    } catch (e) {
-      console.warn("LocalStorage full or disabled", e);
-    }
-  }, [customWallpapers]);
+  // Backup/Restore State
+  const bookmarksFileInputRef = useRef<HTMLInputElement>(null);
+  const settingsFileInputRef = useRef<HTMLInputElement>(null);
 
   // Cropping State
   const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
@@ -251,6 +293,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setPendingWallpaperName(file.name || 'wallpaper');
       const reader = new FileReader();
       reader.onloadend = () => {
         setTempImageSrc(reader.result as string);
@@ -286,12 +329,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     });
   };
 
-  const handleDeleteCustom = (e: React.MouseEvent, url: string) => {
+  const handleDeleteCustom = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const newWallpapers = customWallpapers.filter(w => w !== url);
-    setCustomWallpapers(newWallpapers);
-    if (settings.backgroundImage === url) {
-      onSave({ ...settings, backgroundImage: PRESET_BACKGROUNDS[0] });
+    try {
+      const { deleteWallpaper } = await import('../utils/wallpaperStore');
+      await deleteWallpaper(id);
+      const newWallpapers = customWallpapers.filter(w => w.id !== id);
+      setCustomWallpapers(newWallpapers);
+      if (settings.backgroundImageId === id) {
+        onSave({ ...settings, backgroundImage: PRESET_BACKGROUNDS[0], backgroundImageId: undefined });
+      }
+    } catch (err) {
+      console.warn('Failed to delete wallpaper', err);
     }
   };
 
@@ -304,44 +353,123 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     setCropStart({ ...crop });
   };
 
-  const handleConfirmCrop = () => {
-    if (imageRef.current && tempImageSrc) {
-        const img = imageRef.current;
-        const scaleX = img.naturalWidth / img.width;
-        const scaleY = img.naturalHeight / img.height;
+  const handleConfirmCrop = async () => {
+    if (!(imageRef.current && tempImageSrc)) return;
 
-        const canvas = document.createElement('canvas');
-        const targetWidth = 1920;
-        const targetHeight = 1080;
+    const img = imageRef.current;
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
 
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        
-        if (ctx) {
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(
-                img, 
-                crop.x * scaleX, 
-                crop.y * scaleY, 
-                crop.width * scaleX, 
-                crop.height * scaleY, 
-                0, 
-                0, 
-                targetWidth, 
-                targetHeight
-            );
-            
-            const base64 = canvas.toDataURL('image/jpeg', 0.85);
-            setCustomWallpapers(prev => [base64, ...prev]);
-            onSave({ ...settings, backgroundImage: base64 });
-            setTempImageSrc(null);
-        }
+    // 防御：避免无效尺寸导致 canvas 创建异常
+    if (crop.width <= 0 || crop.height <= 0 || !Number.isFinite(scaleX) || !Number.isFinite(scaleY)) {
+      console.warn('Invalid crop size or image scale, skip saving.');
+      return;
     }
+
+    const canvas = document.createElement('canvas');
+    // 计算裁剪区域在原始图片上的真实尺寸，确保最小为 1 像素
+    const originalCropWidth = Math.max(1, crop.width * scaleX);
+    const originalCropHeight = Math.max(1, crop.height * scaleY);
+
+    // 在不放大的前提下保留原始分辨率，若超出 4K 则按比例下限缩放
+    const maxWidth = 3840;  // 4K 宽度上限
+    const maxHeight = 2160; // 4K 高度上限
+    const scaleCap = Math.min(maxWidth / originalCropWidth, maxHeight / originalCropHeight, 1);
+
+    const targetWidth = Math.round(originalCropWidth * scaleCap);
+    const targetHeight = Math.round(originalCropHeight * scaleCap);
+
+    // 防御：确保目标尺寸有效
+    if (!Number.isFinite(targetWidth) || !Number.isFinite(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
+      console.warn('Invalid target size computed, skip saving.');
+      return;
+    }
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(
+        img, 
+        crop.x * scaleX, 
+        crop.y * scaleY, 
+        crop.width * scaleX, 
+        crop.height * scaleY, 
+        0, 
+        0, 
+        targetWidth, 
+        targetHeight
+    );
+
+    await new Promise<void>((resolve) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          console.warn('Failed to export blob');
+          resolve();
+          return;
+        }
+        try {
+          const { saveWallpaper } = await import('../utils/wallpaperStore');
+          const saved = await saveWallpaper(blob, pendingWallpaperName || 'wallpaper');
+          setCustomWallpapers(prev => [saved, ...prev]);
+          onSave({ ...settings, backgroundImage: saved.url, backgroundImageId: saved.id });
+          setTempImageSrc(null);
+        } catch (e) {
+          console.warn('Failed to save wallpaper', e);
+        } finally {
+          resolve();
+        }
+      }, 'image/png');
+    });
   };
 
   const handleCancelCrop = () => {
     setTempImageSrc(null);
+  };
+
+  // Backup/Restore Handlers
+  const handleExportBookmarks = () => {
+    exportBookmarks(bookmarks);
+  };
+
+  const handleImportBookmarks = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    importBookmarks(file)
+      .then((bookmarks) => {
+        onRestoreBookmarks(bookmarks);
+        alert('Bookmarks restored successfully!');
+        if (bookmarksFileInputRef.current) {
+          bookmarksFileInputRef.current.value = '';
+        }
+      })
+      .catch((error) => {
+        alert(`Failed to restore bookmarks: ${error.message}`);
+      });
+  };
+
+  const handleExportSettings = () => {
+    exportSettings(settings, currentEngine);
+  };
+
+  const handleImportSettings = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    importSettings(file)
+      .then(({ settings: importedSettings, currentEngine: importedEngine }) => {
+        onRestoreSettings(importedSettings, importedEngine);
+        alert('Settings restored successfully!');
+        if (settingsFileInputRef.current) {
+          settingsFileInputRef.current.value = '';
+        }
+      })
+      .catch((error) => {
+        alert(`Failed to restore settings: ${error.message}`);
+      });
   };
 
   if (!isOpen) return null;
@@ -462,7 +590,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 {PRESET_BACKGROUNDS.map((url, idx) => (
                     <button
                     key={idx}
-                    onClick={() => onSave({ ...settings, backgroundImage: url })}
+                  onClick={() => onSave({ ...settings, backgroundImage: url, backgroundImageId: undefined })}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all group ${settings.backgroundImage === url ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
                     >
                     <img src={url} className="w-full h-full object-cover" alt="preset" />
@@ -486,23 +614,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                  </div>
 
                  {customWallpapers.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-3">
-                        {customWallpapers.map((url, idx) => (
-                            <div 
-                                key={`custom-${idx}`} 
-                                onClick={() => onSave({ ...settings, backgroundImage: url })}
-                                className={`relative aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${settings.backgroundImage === url ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
-                            >
-                                <img src={url} className="w-full h-full object-cover" alt="custom" />
-                                <button
-                                    onClick={(e) => handleDeleteCustom(e, url)}
-                                    className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-red-500 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 className="w-3 h-3" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {customWallpapers.map((item, idx) => (
+                      <div 
+                        key={item.id}
+                        onClick={() => onSave({ ...settings, backgroundImage: item.url, backgroundImageId: item.id })}
+                        className={`relative aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${settings.backgroundImageId === item.id ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
+                      >
+                        <img src={item.url} className="w-full h-full object-cover" alt={item.name || 'custom'} />
+                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const { getWallpaperBlob } = await import('../utils/wallpaperStore');
+                                const blob = await getWallpaperBlob(item.id);
+                                if (!blob) return;
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = item.name || `wallpaper-${idx + 1}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                              } catch (err) {
+                                console.warn('Failed to download wallpaper', err);
+                              }
+                            }}
+                            className="p-1 bg-black/50 hover:bg-blue-500 rounded text-white transition-colors"
+                            title="Download wallpaper"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteCustom(e, item.id)}
+                            className="p-1 bg-black/50 hover:bg-red-500 rounded text-white transition-colors"
+                            title="Delete wallpaper"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                  ) : (
                     <div 
                         onClick={() => fileInputRef.current?.click()}
@@ -593,9 +748,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             `}</style>
             <div className="space-y-5">
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Global Scale</label>
-                        <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
+                            <button
+                                onClick={() => onSave({...settings, globalScale: DEFAULT_SETTINGS.globalScale})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -607,9 +771,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Overlay Opacity</label>
-                        <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
+                            <button
+                                onClick={() => onSave({...settings, opacityLevel: DEFAULT_SETTINGS.opacityLevel!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -621,9 +794,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Blur Amount</label>
-                        <span className="text-blue-600 font-semibold">{settings.blurLevel}px</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.blurLevel}px</span>
+                            <button
+                                onClick={() => onSave({...settings, blurLevel: DEFAULT_SETTINGS.blurLevel!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -635,9 +817,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Max Search History</label>
-                        <span className="text-blue-600 font-semibold">{settings.maxHistoryItems} items</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.maxHistoryItems} items</span>
+                            <button
+                                onClick={() => onSave({...settings, maxHistoryItems: DEFAULT_SETTINGS.maxHistoryItems!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -649,9 +840,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Max Search Suggestions</label>
-                        <span className="text-blue-600 font-semibold">{settings.maxSuggestions} items</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.maxSuggestions} items</span>
+                            <button
+                                onClick={() => onSave({...settings, maxSuggestions: DEFAULT_SETTINGS.maxSuggestions!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -669,9 +869,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             {/* Search Bar & Clock Controls */}
             <div className="space-y-5">
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Search Bar Opacity</label>
-                        <span className="text-blue-600 font-semibold">{settings.searchBarOpacity ?? 40}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.searchBarOpacity ?? 40}%</span>
+                            <button
+                                onClick={() => onSave({...settings, searchBarOpacity: DEFAULT_SETTINGS.searchBarOpacity!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -683,9 +892,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Search Bar Blur</label>
-                        <span className="text-blue-600 font-semibold">{settings.searchBarBlur ?? 24}px</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.searchBarBlur ?? 24}px</span>
+                            <button
+                                onClick={() => onSave({...settings, searchBarBlur: DEFAULT_SETTINGS.searchBarBlur!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -697,9 +915,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
               <div>
-                <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                   <label>Time Position</label>
-                  <span className="text-blue-600 font-semibold">{settings.timeOffsetY ?? 0}px</span>
+                  <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.timeOffsetY ?? 0}px</span>
+                      <button
+                          onClick={() => onSave({...settings, timeOffsetY: DEFAULT_SETTINGS.timeOffsetY!})}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Reset to default"
+                      >
+                          <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                  </div>
                 </div>
                 <input
                 type="range"
@@ -711,9 +938,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 />
               </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Time Font Size</label>
-                        <span className="text-blue-600 font-semibold">{settings.timeFontSize ?? 96}px</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.timeFontSize ?? 96}px</span>
+                            <button
+                                onClick={() => onSave({...settings, timeFontSize: DEFAULT_SETTINGS.timeFontSize!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -725,9 +961,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Date Position</label>
-                      <span className="text-blue-600 font-semibold">{settings.dateOffsetY ?? 0}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.dateOffsetY ?? 0}px</span>
+                          <button
+                              onClick={() => onSave({...settings, dateOffsetY: DEFAULT_SETTINGS.dateOffsetY!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -739,9 +984,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                   <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Date Font Size</label>
-                      <span className="text-blue-600 font-semibold">{settings.dateFontSize ?? 24}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.dateFontSize ?? 24}px</span>
+                          <button
+                              onClick={() => onSave({...settings, dateFontSize: DEFAULT_SETTINGS.dateFontSize!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -753,9 +1007,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Search Bar Position</label>
-                      <span className="text-blue-600 font-semibold">{settings.searchBarOffsetY ?? 0}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.searchBarOffsetY ?? 0}px</span>
+                          <button
+                              onClick={() => onSave({...settings, searchBarOffsetY: DEFAULT_SETTINGS.searchBarOffsetY!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -767,9 +1030,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Shortcuts Position</label>
-                      <span className="text-blue-600 font-semibold">{settings.shortcutsOffsetY ?? 0}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.shortcutsOffsetY ?? 0}px</span>
+                          <button
+                              onClick={() => onSave({...settings, shortcutsOffsetY: DEFAULT_SETTINGS.shortcutsOffsetY!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -780,6 +1052,79 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     className="w-full"
                     />
                   </div>
+            </div>
+
+            <hr className="border-gray-200" />
+
+            {/* Backup & Restore Section */}
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold text-gray-800 mb-3">Backup & Restore</h3>
+              
+              {/* Bookmarks Backup/Restore */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">Bookmarks</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Export or import all shortcuts and folders</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportBookmarks}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => bookmarksFileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4" />
+                    Import
+                  </button>
+                  <input
+                    ref={bookmarksFileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportBookmarks}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Settings Backup/Restore */}
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">Settings</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Export or import all settings (wallpaper excluded)</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportSettings}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => settingsFileInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                  >
+                    <FileUp className="w-4 h-4" />
+                    Import
+                  </button>
+                  <input
+                    ref={settingsFileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportSettings}
+                    className="hidden"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
