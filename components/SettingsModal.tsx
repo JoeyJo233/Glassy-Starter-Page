@@ -1,6 +1,23 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Upload, Trash2, Check, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Trash2, Check, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import { AppSettings } from '../types';
+
+// 默认设置值（需要与 App.tsx 中的 getDefaultSettings 保持一致）
+const DEFAULT_SETTINGS: Partial<AppSettings> = {
+  blurLevel: 0,
+  opacityLevel: 25,
+  maxHistoryItems: 5,
+  maxSuggestions: 5,
+  searchBarOpacity: 55,
+  searchBarBlur: 24,
+  timeFontSize: 110,
+  dateFontSize: 22,
+  timeOffsetY: 0,
+  dateOffsetY: -20,
+  searchBarOffsetY: -20,
+  shortcutsOffsetY: -20,
+  globalScale: 100,
+};
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -593,9 +610,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             `}</style>
             <div className="space-y-5">
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Global Scale</label>
-                        <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
+                            <button
+                                onClick={() => onSave({...settings, globalScale: DEFAULT_SETTINGS.globalScale})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -607,9 +633,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Overlay Opacity</label>
-                        <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
+                            <button
+                                onClick={() => onSave({...settings, opacityLevel: DEFAULT_SETTINGS.opacityLevel!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -621,9 +656,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Blur Amount</label>
-                        <span className="text-blue-600 font-semibold">{settings.blurLevel}px</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.blurLevel}px</span>
+                            <button
+                                onClick={() => onSave({...settings, blurLevel: DEFAULT_SETTINGS.blurLevel!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -635,9 +679,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Max Search History</label>
-                        <span className="text-blue-600 font-semibold">{settings.maxHistoryItems} items</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.maxHistoryItems} items</span>
+                            <button
+                                onClick={() => onSave({...settings, maxHistoryItems: DEFAULT_SETTINGS.maxHistoryItems!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -649,9 +702,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                  <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Max Search Suggestions</label>
-                        <span className="text-blue-600 font-semibold">{settings.maxSuggestions} items</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.maxSuggestions} items</span>
+                            <button
+                                onClick={() => onSave({...settings, maxSuggestions: DEFAULT_SETTINGS.maxSuggestions!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -669,9 +731,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
             {/* Search Bar & Clock Controls */}
             <div className="space-y-5">
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Search Bar Opacity</label>
-                        <span className="text-blue-600 font-semibold">{settings.searchBarOpacity ?? 40}%</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.searchBarOpacity ?? 40}%</span>
+                            <button
+                                onClick={() => onSave({...settings, searchBarOpacity: DEFAULT_SETTINGS.searchBarOpacity!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -683,9 +754,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Search Bar Blur</label>
-                        <span className="text-blue-600 font-semibold">{settings.searchBarBlur ?? 24}px</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.searchBarBlur ?? 24}px</span>
+                            <button
+                                onClick={() => onSave({...settings, searchBarBlur: DEFAULT_SETTINGS.searchBarBlur!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -697,9 +777,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
               <div>
-                <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                   <label>Time Position</label>
-                  <span className="text-blue-600 font-semibold">{settings.timeOffsetY ?? 0}px</span>
+                  <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.timeOffsetY ?? 0}px</span>
+                      <button
+                          onClick={() => onSave({...settings, timeOffsetY: DEFAULT_SETTINGS.timeOffsetY!})}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Reset to default"
+                      >
+                          <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                  </div>
                 </div>
                 <input
                 type="range"
@@ -711,9 +800,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 />
               </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                         <label>Time Font Size</label>
-                        <span className="text-blue-600 font-semibold">{settings.timeFontSize ?? 96}px</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.timeFontSize ?? 96}px</span>
+                            <button
+                                onClick={() => onSave({...settings, timeFontSize: DEFAULT_SETTINGS.timeFontSize!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
                     </div>
                     <input
                     type="range"
@@ -725,9 +823,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                 <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Date Position</label>
-                      <span className="text-blue-600 font-semibold">{settings.dateOffsetY ?? 0}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.dateOffsetY ?? 0}px</span>
+                          <button
+                              onClick={() => onSave({...settings, dateOffsetY: DEFAULT_SETTINGS.dateOffsetY!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -739,9 +846,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                 </div>
                   <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Date Font Size</label>
-                      <span className="text-blue-600 font-semibold">{settings.dateFontSize ?? 24}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.dateFontSize ?? 24}px</span>
+                          <button
+                              onClick={() => onSave({...settings, dateFontSize: DEFAULT_SETTINGS.dateFontSize!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -753,9 +869,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Search Bar Position</label>
-                      <span className="text-blue-600 font-semibold">{settings.searchBarOffsetY ?? 0}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.searchBarOffsetY ?? 0}px</span>
+                          <button
+                              onClick={() => onSave({...settings, searchBarOffsetY: DEFAULT_SETTINGS.searchBarOffsetY!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
@@ -767,9 +892,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                     />
                   </div>
                   <div>
-                    <div className="flex justify-between text-sm font-medium text-gray-700 mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                       <label>Shortcuts Position</label>
-                      <span className="text-blue-600 font-semibold">{settings.shortcutsOffsetY ?? 0}px</span>
+                      <div className="flex items-center gap-2">
+                          <span className="text-blue-600 font-semibold">{settings.shortcutsOffsetY ?? 0}px</span>
+                          <button
+                              onClick={() => onSave({...settings, shortcutsOffsetY: DEFAULT_SETTINGS.shortcutsOffsetY!})}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title="Reset to default"
+                          >
+                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                          </button>
+                      </div>
                     </div>
                     <input
                     type="range"
