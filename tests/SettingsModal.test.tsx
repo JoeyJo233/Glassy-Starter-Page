@@ -3,6 +3,13 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import SettingsModal from '../components/SettingsModal';
 import { AppSettings } from '../types';
 
+vi.mock('../utils/wallpaperStore', () => ({
+  listWallpapers: vi.fn(async () => []),
+  saveWallpaper: vi.fn(async (blob: Blob, name: string) => ({ id: 'id-1', name, createdAt: Date.now(), url: 'blob:mock' })),
+  deleteWallpaper: vi.fn(async () => {}),
+  getWallpaperBlob: vi.fn(async () => new Blob()),
+}));
+
 describe('SettingsModal', () => {
   const defaultSettings: AppSettings = {
     backgroundImage: 'https://example.com/bg.jpg',

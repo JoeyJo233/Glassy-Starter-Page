@@ -22,6 +22,7 @@ export interface BookmarkItem {
 
 export interface AppSettings {
   backgroundImage: string;
+  backgroundImageId?: string; // IndexedDB id for custom wallpapers
   blurLevel: number; // 0 to 20
   opacityLevel: number; // 0 to 100
   maxHistoryItems: number;

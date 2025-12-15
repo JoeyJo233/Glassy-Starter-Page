@@ -13,6 +13,7 @@ import FolderView from './components/FolderView';
 const App: React.FC = () => {
   const getDefaultSettings = (): AppSettings => ({
     backgroundImage: DEFAULT_BACKGROUND,
+    backgroundImageId: undefined,
     blurLevel: 0,
     opacityLevel: 25,
     maxHistoryItems: 5,
@@ -124,10 +125,59 @@ const App: React.FC = () => {
     calculateTextColor();
   }, [settings.backgroundImage, settings.opacityLevel]);
 
-  // Persistence Effects
-  useEffect(() => localStorage.setItem('appSettings', JSON.stringify(settings)), [settings]);
-  useEffect(() => localStorage.setItem('bookmarks', JSON.stringify(items)), [items]);
-  useEffect(() => localStorage.setItem('currentEngine', currentEngineId), [currentEngineId]);
+  // Persistence Effects - wrap with try/catch to avoid crashes (especially for large base64 wallpapers)
+  useEffect(() => {
+    try {
+      localStorage.setItem('appSettings', JSON.stringify(settings));
+    } catch (e) {
+      console.warn('Failed to persist appSettings (possibly quota exceeded).', e);
+      // Fallback: try to persist without backgroundImage if it is a large data URL
+      if (settings.backgroundImage?.startsWith('data:')) {
+        try {
+          const { backgroundImage, ...rest } = settings;
+          localStorage.setItem('appSettings', JSON.stringify(rest));
+          console.warn('Persisted appSettings without backgroundImage to avoid quota issues.');
+        } catch (err) {
+          console.warn('Fallback persistence for appSettings also failed.', err);
+        }
+      }
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bookmarks', JSON.stringify(items));
+    } catch (e) {
+      console.warn('Failed to persist bookmarks.', e);
+    }
+  }, [items]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('currentEngine', currentEngineId);
+    } catch (e) {
+      console.warn('Failed to persist currentEngine.', e);
+    }
+  }, [currentEngineId]);
+
+  // Resolve custom wallpaper from IndexedDB when backgroundImageId is present
+  useEffect(() => {
+    const resolveCustomWallpaper = async () => {
+      if (!settings.backgroundImageId) return;
+      // If already a blob URL, skip
+      if (settings.backgroundImage && settings.backgroundImage.startsWith('blob:')) return;
+      try {
+        const { getWallpaperBlob } = await import('./utils/wallpaperStore');
+        const blob = await getWallpaperBlob(settings.backgroundImageId);
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        setSettings(prev => ({ ...prev, backgroundImage: url }));
+      } catch (e) {
+        console.warn('Failed to resolve custom wallpaper from IndexedDB', e);
+      }
+    };
+    resolveCustomWallpaper();
+  }, [settings.backgroundImageId]);
 
   // Handlers
   const handleAddItem = () => {

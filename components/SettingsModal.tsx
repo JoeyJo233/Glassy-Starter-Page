@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Upload, Trash2, Check, Image as ImageIcon, RotateCcw } from 'lucide-react';
+import { X, Upload, Trash2, Check, Image as ImageIcon, RotateCcw, Download } from 'lucide-react';
 import { AppSettings } from '../types';
+import { WallpaperWithURL } from '../utils/wallpaperStore';
 
 // 默认设置值（需要与 App.tsx 中的 getDefaultSettings 保持一致）
 const DEFAULT_SETTINGS: Partial<AppSettings> = {
@@ -65,6 +66,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
+  // Load wallpapers from IndexedDB when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    const load = async () => {
+      setIsLoadingWallpapers(true);
+      try {
+        const { listWallpapers } = await import('../utils/wallpaperStore');
+        const list = await listWallpapers();
+        setCustomWallpapers(list);
+      } catch (e) {
+        console.warn('Failed to load wallpapers', e);
+      } finally {
+        setIsLoadingWallpapers(false);
+      }
+    };
+    load();
+  }, [isOpen]);
+
   // Save modal width to localStorage
   useEffect(() => {
     try {
@@ -116,23 +135,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     resizeStartWidth.current = modalWidth;
   };
 
-  // Custom Wallpapers State
-  const [customWallpapers, setCustomWallpapers] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('customWallpapers');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('customWallpapers', JSON.stringify(customWallpapers));
-    } catch (e) {
-      console.warn("LocalStorage full or disabled", e);
-    }
-  }, [customWallpapers]);
+  // Custom Wallpapers State (IndexedDB)
+  const [customWallpapers, setCustomWallpapers] = useState<WallpaperWithURL[]>([]);
+  const [isLoadingWallpapers, setIsLoadingWallpapers] = useState(false);
+  const [pendingWallpaperName, setPendingWallpaperName] = useState('wallpaper');
 
   // Cropping State
   const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
@@ -268,6 +274,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setPendingWallpaperName(file.name || 'wallpaper');
       const reader = new FileReader();
       reader.onloadend = () => {
         setTempImageSrc(reader.result as string);
@@ -303,12 +310,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     });
   };
 
-  const handleDeleteCustom = (e: React.MouseEvent, url: string) => {
+  const handleDeleteCustom = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const newWallpapers = customWallpapers.filter(w => w !== url);
-    setCustomWallpapers(newWallpapers);
-    if (settings.backgroundImage === url) {
-      onSave({ ...settings, backgroundImage: PRESET_BACKGROUNDS[0] });
+    try {
+      const { deleteWallpaper } = await import('../utils/wallpaperStore');
+      await deleteWallpaper(id);
+      const newWallpapers = customWallpapers.filter(w => w.id !== id);
+      setCustomWallpapers(newWallpapers);
+      if (settings.backgroundImageId === id) {
+        onSave({ ...settings, backgroundImage: PRESET_BACKGROUNDS[0], backgroundImageId: undefined });
+      }
+    } catch (err) {
+      console.warn('Failed to delete wallpaper', err);
     }
   };
 
@@ -321,40 +334,76 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     setCropStart({ ...crop });
   };
 
-  const handleConfirmCrop = () => {
-    if (imageRef.current && tempImageSrc) {
-        const img = imageRef.current;
-        const scaleX = img.naturalWidth / img.width;
-        const scaleY = img.naturalHeight / img.height;
+  const handleConfirmCrop = async () => {
+    if (!(imageRef.current && tempImageSrc)) return;
 
-        const canvas = document.createElement('canvas');
-        const targetWidth = 1920;
-        const targetHeight = 1080;
+    const img = imageRef.current;
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
 
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        const ctx = canvas.getContext('2d');
-        
-        if (ctx) {
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(
-                img, 
-                crop.x * scaleX, 
-                crop.y * scaleY, 
-                crop.width * scaleX, 
-                crop.height * scaleY, 
-                0, 
-                0, 
-                targetWidth, 
-                targetHeight
-            );
-            
-            const base64 = canvas.toDataURL('image/jpeg', 0.85);
-            setCustomWallpapers(prev => [base64, ...prev]);
-            onSave({ ...settings, backgroundImage: base64 });
-            setTempImageSrc(null);
-        }
+    // 防御：避免无效尺寸导致 canvas 创建异常
+    if (crop.width <= 0 || crop.height <= 0 || !Number.isFinite(scaleX) || !Number.isFinite(scaleY)) {
+      console.warn('Invalid crop size or image scale, skip saving.');
+      return;
     }
+
+    const canvas = document.createElement('canvas');
+    // 计算裁剪区域在原始图片上的真实尺寸，确保最小为 1 像素
+    const originalCropWidth = Math.max(1, crop.width * scaleX);
+    const originalCropHeight = Math.max(1, crop.height * scaleY);
+
+    // 在不放大的前提下保留原始分辨率，若超出 4K 则按比例下限缩放
+    const maxWidth = 3840;  // 4K 宽度上限
+    const maxHeight = 2160; // 4K 高度上限
+    const scaleCap = Math.min(maxWidth / originalCropWidth, maxHeight / originalCropHeight, 1);
+
+    const targetWidth = Math.round(originalCropWidth * scaleCap);
+    const targetHeight = Math.round(originalCropHeight * scaleCap);
+
+    // 防御：确保目标尺寸有效
+    if (!Number.isFinite(targetWidth) || !Number.isFinite(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
+      console.warn('Invalid target size computed, skip saving.');
+      return;
+    }
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(
+        img, 
+        crop.x * scaleX, 
+        crop.y * scaleY, 
+        crop.width * scaleX, 
+        crop.height * scaleY, 
+        0, 
+        0, 
+        targetWidth, 
+        targetHeight
+    );
+
+    await new Promise<void>((resolve) => {
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          console.warn('Failed to export blob');
+          resolve();
+          return;
+        }
+        try {
+          const { saveWallpaper } = await import('../utils/wallpaperStore');
+          const saved = await saveWallpaper(blob, pendingWallpaperName || 'wallpaper');
+          setCustomWallpapers(prev => [saved, ...prev]);
+          onSave({ ...settings, backgroundImage: saved.url, backgroundImageId: saved.id });
+          setTempImageSrc(null);
+        } catch (e) {
+          console.warn('Failed to save wallpaper', e);
+        } finally {
+          resolve();
+        }
+      }, 'image/png');
+    });
   };
 
   const handleCancelCrop = () => {
@@ -479,7 +528,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 {PRESET_BACKGROUNDS.map((url, idx) => (
                     <button
                     key={idx}
-                    onClick={() => onSave({ ...settings, backgroundImage: url })}
+                  onClick={() => onSave({ ...settings, backgroundImage: url, backgroundImageId: undefined })}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all group ${settings.backgroundImage === url ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
                     >
                     <img src={url} className="w-full h-full object-cover" alt="preset" />
@@ -503,23 +552,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                  </div>
 
                  {customWallpapers.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-3">
-                        {customWallpapers.map((url, idx) => (
-                            <div 
-                                key={`custom-${idx}`} 
-                                onClick={() => onSave({ ...settings, backgroundImage: url })}
-                                className={`relative aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${settings.backgroundImage === url ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
-                            >
-                                <img src={url} className="w-full h-full object-cover" alt="custom" />
-                                <button
-                                    onClick={(e) => handleDeleteCustom(e, url)}
-                                    className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-red-500 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                    <Trash2 className="w-3 h-3" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {customWallpapers.map((item, idx) => (
+                      <div 
+                        key={item.id}
+                        onClick={() => onSave({ ...settings, backgroundImage: item.url, backgroundImageId: item.id })}
+                        className={`relative aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${settings.backgroundImageId === item.id ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
+                      >
+                        <img src={item.url} className="w-full h-full object-cover" alt={item.name || 'custom'} />
+                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const { getWallpaperBlob } = await import('../utils/wallpaperStore');
+                                const blob = await getWallpaperBlob(item.id);
+                                if (!blob) return;
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = item.name || `wallpaper-${idx + 1}.png`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                URL.revokeObjectURL(url);
+                              } catch (err) {
+                                console.warn('Failed to download wallpaper', err);
+                              }
+                            }}
+                            className="p-1 bg-black/50 hover:bg-blue-500 rounded text-white transition-colors"
+                            title="Download wallpaper"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteCustom(e, item.id)}
+                            className="p-1 bg-black/50 hover:bg-red-500 rounded text-white transition-colors"
+                            title="Delete wallpaper"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                  ) : (
                     <div 
                         onClick={() => fileInputRef.current?.click()}
