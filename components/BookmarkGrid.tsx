@@ -11,6 +11,8 @@ interface BookmarkGridProps {
   onAddItem: () => void;
   offsetY?: number;
   textColor?: string;
+  iconBackgroundOpacity?: number;
+  iconBackgroundBlur?: number;
 }
 
 const BookmarkGrid: React.FC<BookmarkGridProps> = ({
@@ -21,7 +23,9 @@ const BookmarkGrid: React.FC<BookmarkGridProps> = ({
   onDeleteItem,
   onAddItem,
   offsetY = 0,
-  textColor = 'rgb(243, 244, 246)'
+  textColor = 'rgb(243, 244, 246)',
+  iconBackgroundOpacity = 80,
+  iconBackgroundBlur = 0
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggedItem, setDraggedItem] = useState<BookmarkItem | null>(null);
@@ -196,7 +200,13 @@ const BookmarkGrid: React.FC<BookmarkGridProps> = ({
                 ></div>
             )}
 
-            <div className="relative w-14 h-14 bg-white/80 rounded-2xl shadow-lg flex items-center justify-center overflow-hidden mb-2 transition-transform group-hover:-translate-y-1">
+            <div 
+              className="relative w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center overflow-hidden mb-2 transition-transform group-hover:-translate-y-1"
+              style={{
+                backgroundColor: `rgba(255, 255, 255, ${iconBackgroundOpacity / 100})`,
+                backdropFilter: `blur(${iconBackgroundBlur}px)`
+              }}
+            >
               {item.type === 'folder' ? (
                 <div className="grid grid-cols-2 gap-0.5 w-8 h-8 opacity-80">
                   {item.children?.slice(0, 4).map((child, idx) => (

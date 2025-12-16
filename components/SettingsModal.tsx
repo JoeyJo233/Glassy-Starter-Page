@@ -19,6 +19,10 @@ const DEFAULT_SETTINGS: Partial<AppSettings> = {
   searchBarOffsetY: -20,
   shortcutsOffsetY: -20,
   globalScale: 100,
+  iconBackgroundOpacity: 80,
+  iconBackgroundBlur: 0,
+  clockTextColor: '#f3f4f6',
+  shortcutTextColor: '#f3f4f6',
 };
 
 interface SettingsModalProps {
@@ -914,6 +918,52 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="w-full"
                     />
                 </div>
+                <div>
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                        <label>Icon Background Opacity</label>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.iconBackgroundOpacity ?? 80}%</span>
+                            <button
+                                onClick={() => onSave({...settings, iconBackgroundOpacity: DEFAULT_SETTINGS.iconBackgroundOpacity!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
+                    </div>
+                    <input
+                    type="range"
+                min="0"
+                max="100"
+                    value={settings.iconBackgroundOpacity ?? 80}
+                    onChange={(e) => onSave({...settings, iconBackgroundOpacity: parseInt(e.target.value)})}
+                    className="w-full"
+                    />
+                </div>
+                <div>
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                        <label>Icon Background Blur</label>
+                        <div className="flex items-center gap-2">
+                            <span className="text-blue-600 font-semibold">{settings.iconBackgroundBlur ?? 0}px</span>
+                            <button
+                                onClick={() => onSave({...settings, iconBackgroundBlur: DEFAULT_SETTINGS.iconBackgroundBlur!})}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                title="Reset to default"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                            </button>
+                        </div>
+                    </div>
+                    <input
+                    type="range"
+                min="0"
+                max="30"
+                    value={settings.iconBackgroundBlur ?? 0}
+                    onChange={(e) => onSave({...settings, iconBackgroundBlur: parseInt(e.target.value)})}
+                    className="w-full"
+                    />
+                </div>
               <div>
                 <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
                   <label>Time Position</label>
@@ -1052,6 +1102,103 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     className="w-full"
                     />
                   </div>
+            </div>
+
+            <hr className="border-gray-200" />
+
+            {/* Text Colors Section */}
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold text-gray-800 mb-3">Text Colors</h3>
+              
+              {/* Clock Text Color */}
+              <div>
+                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                  <label>Time & Date Color</label>
+                  <button
+                    onClick={() => onSave({...settings, clockTextColor: DEFAULT_SETTINGS.clockTextColor!})}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    title="Reset to default"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                  </button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  {/* Preset colors */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onSave({...settings, clockTextColor: '#ffffff'})}
+                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      style={{ backgroundColor: '#ffffff' }}
+                      title="White"
+                    />
+                    <button
+                      onClick={() => onSave({...settings, clockTextColor: '#9ca3af'})}
+                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      style={{ backgroundColor: '#9ca3af' }}
+                      title="Gray"
+                    />
+                    <button
+                      onClick={() => onSave({...settings, clockTextColor: '#000000'})}
+                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      style={{ backgroundColor: '#000000' }}
+                      title="Black"
+                    />
+                  </div>
+                  {/* Color picker */}
+                  <input
+                    type="color"
+                    value={settings.clockTextColor ?? '#f3f4f6'}
+                    onChange={(e) => onSave({...settings, clockTextColor: e.target.value})}
+                    className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-500 ml-2">{settings.clockTextColor ?? '#f3f4f6'}</span>
+                </div>
+              </div>
+
+              {/* Shortcut Text Color */}
+              <div>
+                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                  <label>Shortcut Caption Color</label>
+                  <button
+                    onClick={() => onSave({...settings, shortcutTextColor: DEFAULT_SETTINGS.shortcutTextColor!})}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    title="Reset to default"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                  </button>
+                </div>
+                <div className="flex gap-2 items-center">
+                  {/* Preset colors */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onSave({...settings, shortcutTextColor: '#ffffff'})}
+                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      style={{ backgroundColor: '#ffffff' }}
+                      title="White"
+                    />
+                    <button
+                      onClick={() => onSave({...settings, shortcutTextColor: '#9ca3af'})}
+                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      style={{ backgroundColor: '#9ca3af' }}
+                      title="Gray"
+                    />
+                    <button
+                      onClick={() => onSave({...settings, shortcutTextColor: '#000000'})}
+                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
+                      style={{ backgroundColor: '#000000' }}
+                      title="Black"
+                    />
+                  </div>
+                  {/* Color picker */}
+                  <input
+                    type="color"
+                    value={settings.shortcutTextColor ?? '#f3f4f6'}
+                    onChange={(e) => onSave({...settings, shortcutTextColor: e.target.value})}
+                    className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-500 ml-2">{settings.shortcutTextColor ?? '#f3f4f6'}</span>
+                </div>
+              </div>
             </div>
 
             <hr className="border-gray-200" />

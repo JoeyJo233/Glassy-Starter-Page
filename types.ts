@@ -36,6 +36,10 @@ export interface AppSettings {
   searchBarOffsetY: number; // -100 to 200 - 搜索栏纵向偏移 (px)
   shortcutsOffsetY: number; // -100 to 200 - 快捷方式纵向偏移 (px)
   globalScale: number; // 50 to 150 - 全局缩放百分比
+  iconBackgroundOpacity: number; // 0 to 100 - 快捷方式图标背景透明度
+  iconBackgroundBlur: number; // 0 to 30 - 快捷方式图标背景模糊度 (px)
+  clockTextColor: string; // 时间日期文字颜色
+  shortcutTextColor: string; // 快捷方式标题文字颜色
 }
 
 export interface DragItem {

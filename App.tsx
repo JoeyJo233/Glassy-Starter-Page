@@ -26,7 +26,11 @@ const App: React.FC = () => {
     dateOffsetY: -20,
     searchBarOffsetY: -20,
     shortcutsOffsetY: -20,
-    globalScale: 100
+    globalScale: 100,
+    iconBackgroundOpacity: 80,
+    iconBackgroundBlur: 0,
+    clockTextColor: '#f3f4f6',
+    shortcutTextColor: '#f3f4f6'
   });
 
   // State: Settings
@@ -207,6 +211,7 @@ const App: React.FC = () => {
           dateFontSize={settings.dateFontSize}
           timeOffsetY={settings.timeOffsetY}
           dateOffsetY={settings.dateOffsetY}
+          textColor={settings.clockTextColor}
         />
 
         <SearchBar
@@ -227,6 +232,9 @@ const App: React.FC = () => {
           onDeleteItem={handleDeleteItem}
           onAddItem={handleAddItem}
           offsetY={settings.shortcutsOffsetY}
+          iconBackgroundOpacity={settings.iconBackgroundOpacity}
+          iconBackgroundBlur={settings.iconBackgroundBlur}
+          textColor={settings.shortcutTextColor}
         />
       </div>
 
