@@ -118,15 +118,18 @@ const App: React.FC = () => {
   }, [currentEngineId]);
 
   // Resolve custom wallpaper from IndexedDB when backgroundImageId is present
+  // Note: Blob URLs don't persist across page reloads, so we must recreate them
   useEffect(() => {
     const resolveCustomWallpaper = async () => {
       if (!settings.backgroundImageId) return;
-      // If already a blob URL, skip
-      if (settings.backgroundImage && settings.backgroundImage.startsWith('blob:')) return;
+      
       try {
         const { getWallpaperBlob } = await import('./utils/wallpaperStore');
         const blob = await getWallpaperBlob(settings.backgroundImageId);
-        if (!blob) return;
+        if (!blob) {
+          console.warn('Wallpaper blob not found for ID:', settings.backgroundImageId);
+          return;
+        }
         const url = URL.createObjectURL(blob);
         setSettings(prev => ({ ...prev, backgroundImage: url }));
       } catch (e) {
