@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build cache
+.vite/
+*.tsbuildinfo
+
+# Test coverage output
+coverage/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
