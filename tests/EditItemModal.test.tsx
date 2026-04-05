@@ -179,4 +179,48 @@ describe('EditItemModal - 文件夹模式', () => {
     const titleInput = screen.getByPlaceholderText('e.g. GitHub');
     expect(titleInput).toHaveValue('My Folder');
   });
+
+  it('编辑文件夹时不应该显示 URL 输入框', () => {
+    render(<EditItemModal {...defaultProps} />);
+
+    expect(screen.queryByPlaceholderText('https://example.com')).not.toBeInTheDocument();
+  });
+
+  it('标题栏应该显示 Edit Folder', () => {
+    render(<EditItemModal {...defaultProps} />);
+
+    expect(screen.getByText('Edit Folder')).toBeInTheDocument();
+  });
+
+  it('保存文件夹时应该保留 type、id 和 children', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const folderWithChildren: BookmarkItem = {
+      id: 'folder-1',
+      type: 'folder',
+      title: 'My Folder',
+      icon: '📁',
+      children: [
+        { id: 'child-1', type: 'link', title: 'Child Link', url: 'https://example.com', icon: '' },
+      ],
+    };
+
+    render(<EditItemModal isOpen={true} onClose={vi.fn()} item={folderWithChildren} onSave={onSave} />);
+
+    const titleInput = screen.getByPlaceholderText('e.g. GitHub');
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Renamed Folder');
+
+    const saveButton = screen.getByRole('button', { name: /save shortcut/i });
+    await user.click(saveButton);
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'folder-1',
+        type: 'folder',
+        title: 'Renamed Folder',
+        children: folderWithChildren.children,
+      })
+    );
+  });
 });

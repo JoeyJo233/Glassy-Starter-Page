@@ -20,8 +20,10 @@ coverage/
 *.swp
 *.swo
 
+# Build output (run `npm run build` to regenerate)
+dist/
+
 # Release archives
-dist.zip
 *.zip
 
 # Logs
