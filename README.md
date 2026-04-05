@@ -2,19 +2,44 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# GlassyStart
 
-This contains everything you need to run your app locally.
+A glassmorphism-style browser new tab extension built with React + Vite. Features a customizable clock, search bar with multi-engine support, bookmark grid with folder support, and a wallpaper manager.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1goCmKC9Gs5oxznSue2_3HKrRufuJgEaD
+## Features
+
+- **Wallpaper** — upload custom wallpapers (stored in IndexedDB, supports 4K), or choose from presets
+- **Search** — Google, Bing, DuckDuckGo, Yandex with search history and suggestions
+- **Bookmarks** — drag-to-reorder grid, folders, custom icons with crop tool
+- **Appearance** — blur/opacity overlays, glassmorphism search bar, clock/text colors
+- **Layout** — global scale, per-element Y offsets, font sizes
+- **Data** — export/import bookmarks and settings as JSON
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. Run the app:
+   ```bash
+   npm run dev
+   ```
+
+## Build & Install as Chrome Extension
+
+```bash
+npm run build
+```
+
+Then load the `dist/` folder as an unpacked Chrome extension (`chrome://extensions/` → Developer mode → Load unpacked).
+
+See [INSTALL.md](INSTALL.md) for detailed instructions.
+
+## Notes
+
+- Fonts (Inter) load from Google Fonts; system fallback is used offline
+- Default backgrounds and search suggestion APIs require a network connection
+- Custom wallpapers are stored locally in IndexedDB and work fully offline

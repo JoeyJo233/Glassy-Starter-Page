@@ -94,15 +94,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
-  // Load wallpapers from IndexedDB when modal opens
+  // Load wallpapers from IndexedDB when modal opens; revoke old blob URLs when closing/refreshing
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setCustomWallpapers(prev => {
+        prev.forEach(w => URL.revokeObjectURL(w.url));
+        return [];
+      });
+      return;
+    }
     const load = async () => {
       setIsLoadingWallpapers(true);
       try {
         const { listWallpapers } = await import('../utils/wallpaperStore');
         const list = await listWallpapers();
-        setCustomWallpapers(list);
+        setCustomWallpapers(prev => {
+          prev.forEach(w => URL.revokeObjectURL(w.url));
+          return list;
+        });
       } catch (e) {
         console.warn('Failed to load wallpapers', e);
       } finally {

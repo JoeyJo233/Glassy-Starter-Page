@@ -20,6 +20,10 @@ coverage/
 *.swp
 *.swo
 
+# Release archives
+dist.zip
+*.zip
+
 # Logs
 *.log
 npm-debug.log*

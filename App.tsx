@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { BookmarkItem, SearchEngineId, AppSettings } from './types';
 import { DEFAULT_BACKGROUND, INITIAL_BOOKMARKS } from './constants';
@@ -39,12 +39,13 @@ const App: React.FC = () => {
     const defaults = getDefaultSettings();
     
     if (saved) {
-      const parsed = JSON.parse(saved);
-      // Merge defaults with saved settings (saved settings override defaults)
-      return {
-        ...defaults,
-        ...parsed
-      };
+      try {
+        const parsed = JSON.parse(saved);
+        // Merge defaults with saved settings (saved settings override defaults)
+        return { ...defaults, ...parsed };
+      } catch (e) {
+        console.warn('Failed to parse appSettings from localStorage, using defaults.', e);
+      }
     }
     
     return defaults;
@@ -74,7 +75,14 @@ const App: React.FC = () => {
   // State: Data
   const [items, setItems] = useState<BookmarkItem[]>(() => {
     const saved = localStorage.getItem('bookmarks');
-    return saved ? JSON.parse(saved) : INITIAL_BOOKMARKS;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Failed to parse bookmarks from localStorage, using defaults.', e);
+      }
+    }
+    return INITIAL_BOOKMARKS;
   });
 
   const [currentEngineId, setCurrentEngineId] = useState<SearchEngineId>(() => {
@@ -121,12 +129,15 @@ const App: React.FC = () => {
     }
   }, [currentEngineId]);
 
+  // Track blob URL created for the active custom wallpaper so we can revoke it on change/unmount
+  const blobUrlRef = useRef<string | null>(null);
+
   // Resolve custom wallpaper from IndexedDB when backgroundImageId is present
   // Note: Blob URLs don't persist across page reloads, so we must recreate them
   useEffect(() => {
     const resolveCustomWallpaper = async () => {
       if (!settings.backgroundImageId) return;
-      
+
       try {
         const { getWallpaperBlob } = await import('./utils/wallpaperStore');
         const blob = await getWallpaperBlob(settings.backgroundImageId);
@@ -135,12 +146,19 @@ const App: React.FC = () => {
           return;
         }
         const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
         setSettings(prev => ({ ...prev, backgroundImage: url }));
       } catch (e) {
         console.warn('Failed to resolve custom wallpaper from IndexedDB', e);
       }
     };
     resolveCustomWallpaper();
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, [settings.backgroundImageId]);
 
   // Handlers

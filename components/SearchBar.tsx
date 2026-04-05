@@ -29,7 +29,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const [showEngineMenu, setShowEngineMenu] = useState(false);
   const [history, setHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('searchHistory');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn('Failed to parse searchHistory from localStorage.', e);
+      }
+    }
+    return [];
   });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);

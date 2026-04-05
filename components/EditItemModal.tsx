@@ -20,6 +20,7 @@ interface CropState {
 type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 
 const EditItemModal: React.FC<EditItemModalProps> = ({ isOpen, onClose, item, onSave }) => {
+  const isFolder = item?.type === 'folder';
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [storedIcon, setStoredIcon] = useState('');
@@ -228,24 +229,28 @@ const EditItemModal: React.FC<EditItemModalProps> = ({ isOpen, onClose, item, on
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Use stored custom icon OR auto-generated one
-    const finalIcon = storedIcon || `https://www.google.com/s2/favicons?domain=${url}&sz=128`;
-    
-    const newItem: BookmarkItem = {
-      id: item ? item.id : Date.now().toString(),
-      type: 'link', 
-      title,
-      url,
-      icon: finalIcon,
-    };
-    onSave(newItem);
+
+    if (isFolder && item) {
+      // Editing a folder: preserve type and children, only allow title/icon changes
+      onSave({ ...item, title, icon: storedIcon || item.icon || '📁' });
+    } else {
+      // Link: use stored custom icon OR auto-generated one
+      const finalIcon = storedIcon || `https://www.google.com/s2/favicons?domain=${url}&sz=128`;
+      onSave({
+        id: item ? item.id : Date.now().toString(),
+        type: 'link',
+        title,
+        url,
+        icon: finalIcon,
+      });
+    }
     onClose();
   };
 
   if (!isOpen) return null;
 
   // Determine what to show in preview
-  const autoIconUrl = url ? `https://www.google.com/s2/favicons?domain=${url}&sz=128` : '';
+  const autoIconUrl = !isFolder && url ? `https://www.google.com/s2/favicons?domain=${url}&sz=128` : '';
   const displayIcon = storedIcon || autoIconUrl;
 
   return (
@@ -253,7 +258,7 @@ const EditItemModal: React.FC<EditItemModalProps> = ({ isOpen, onClose, item, on
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden animate-slide-up p-6">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-semibold text-gray-800">{item ? 'Edit Shortcut' : 'Add Shortcut'}</h3>
+          <h3 className="text-xl font-semibold text-gray-800">{isFolder ? 'Edit Folder' : item ? 'Edit Shortcut' : 'Add Shortcut'}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />
           </button>
@@ -273,6 +278,7 @@ const EditItemModal: React.FC<EditItemModalProps> = ({ isOpen, onClose, item, on
                 placeholder="e.g. GitHub"
                 />
             </div>
+            {!isFolder && (
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
                 <input
@@ -284,6 +290,7 @@ const EditItemModal: React.FC<EditItemModalProps> = ({ isOpen, onClose, item, on
                 placeholder="https://example.com"
                 />
             </div>
+            )}
           </div>
 
           {/* Icon Section */}
