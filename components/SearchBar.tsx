@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, ChevronDown, History, X } from 'lucide-react';
 import { SearchEngineId } from '../types';
-import { SEARCH_ENGINES, CORS_PROXY } from '../constants';
+import { SEARCH_ENGINES } from '../constants';
 
 interface SearchBarProps {
   currentEngineId: SearchEngineId;
@@ -91,11 +91,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         abortControllerRef.current = controller;
 
         try {
-            let apiUrl = `${currentEngine.suggestionUrl}${encodeURIComponent(query)}`;
-            if (currentEngine.useCorsProxy) {
-                apiUrl = `${CORS_PROXY}${encodeURIComponent(apiUrl)}`;
-            }
-
+            const apiUrl = `${currentEngine.suggestionUrl}${encodeURIComponent(query)}`;
             const response = await fetch(apiUrl, { signal: controller.signal });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 

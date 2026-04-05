@@ -6,7 +6,6 @@ export interface SearchEngine {
   icon: string; // URL or Lucide component name logic
   searchUrl: string;
   suggestionUrl?: string;
-  useCorsProxy?: boolean; // 是否需要使用 CORS 代理
 }
 
 export type ItemType = 'link' | 'folder';

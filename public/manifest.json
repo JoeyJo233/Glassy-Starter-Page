@@ -15,6 +15,9 @@
     "storage"
   ],
   "host_permissions": [
-    "https://corsproxy.io/*"
+    "https://suggestqueries.google.com/*",
+    "https://api.bing.com/*",
+    "https://duckduckgo.com/*",
+    "https://yandex.com/*"
   ]
 }

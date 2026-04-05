@@ -9,7 +9,6 @@ export const SEARCH_ENGINES: SearchEngine[] = [
     icon: 'https://www.google.com/favicon.ico',
     searchUrl: 'https://www.google.com/search?q=',
     suggestionUrl: 'https://suggestqueries.google.com/complete/search?client=firefox&q=',
-    useCorsProxy: true,
   },
   {
     id: 'bing',
@@ -17,7 +16,6 @@ export const SEARCH_ENGINES: SearchEngine[] = [
     icon: 'https://www.bing.com/sa/simg/favicon-2x.ico',
     searchUrl: 'https://www.bing.com/search?q=',
     suggestionUrl: 'https://api.bing.com/osjson.aspx?query=',
-    useCorsProxy: true,
   },
   {
     id: 'duckduckgo',
@@ -25,7 +23,6 @@ export const SEARCH_ENGINES: SearchEngine[] = [
     icon: 'https://duckduckgo.com/favicon.ico',
     searchUrl: 'https://duckduckgo.com/?q=',
     suggestionUrl: 'https://duckduckgo.com/ac/?type=list&q=',
-    useCorsProxy: true,
   },
   {
     id: 'yandex',
@@ -33,12 +30,8 @@ export const SEARCH_ENGINES: SearchEngine[] = [
     icon: 'https://yastatic.net/s3/home-static/_/37/37a02b5dc7a51abac55d8a5b6c865f0e.png',
     searchUrl: 'https://yandex.com/search/?text=',
     suggestionUrl: 'https://yandex.com/suggest/suggest-ya.cgi?v=4&json=1&part=',
-    useCorsProxy: true,
   },
 ];
-
-// CORS 代理配置 - 用于绕过浏览器跨域限制
-export const CORS_PROXY = 'https://corsproxy.io/?';
 
 export const INITIAL_BOOKMARKS: BookmarkItem[] = [
   {
