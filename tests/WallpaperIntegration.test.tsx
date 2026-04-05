@@ -37,6 +37,8 @@ describe('Wallpaper Integration Tests', () => {
     globalScale: 100,
     iconBackgroundOpacity: 80,
     iconBackgroundBlur: 0,
+    searchMenuOpacity: 80,
+    searchMenuBlur: 40,
     clockTextColor: '#f3f4f6',
     shortcutTextColor: '#f3f4f6',
   };

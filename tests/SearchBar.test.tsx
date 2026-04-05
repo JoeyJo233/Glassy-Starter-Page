@@ -97,6 +97,49 @@ describe('SearchBar', () => {
     expect(onEngineChange).toHaveBeenCalledWith('bing');
   });
 
+  it('打开搜索引擎菜单时应该隐藏历史/联想菜单', async () => {
+    localStorage.setItem('searchHistory', JSON.stringify(['previous search']));
+
+    const user = userEvent.setup();
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByPlaceholderText('Search...');
+    await user.click(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('previous search')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /google/i }));
+
+    expect(screen.getByText('Bing')).toBeInTheDocument();
+    expect(screen.queryByText('previous search')).not.toBeInTheDocument();
+  });
+
+  it('点击已聚焦的输入框时应该关闭搜索引擎菜单并显示搜索历史', async () => {
+    localStorage.setItem('searchHistory', JSON.stringify(['previous search']));
+
+    const user = userEvent.setup();
+    render(<SearchBar {...defaultProps} />);
+
+    const input = screen.getByPlaceholderText('Search...');
+    await user.click(input);
+
+    await waitFor(() => {
+      expect(screen.getByText('previous search')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /google/i }));
+    expect(screen.getByText('Bing')).toBeInTheDocument();
+
+    await user.click(input);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Bing')).not.toBeInTheDocument();
+      expect(screen.getByText('previous search')).toBeInTheDocument();
+    });
+  });
+
   it('输入为空时不应该执行搜索', async () => {
     const user = userEvent.setup();
     render(<SearchBar {...defaultProps} />);

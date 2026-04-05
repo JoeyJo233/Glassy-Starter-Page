@@ -10,6 +10,13 @@ import SettingsModal from './components/SettingsModal';
 import EditItemModal from './components/EditItemModal';
 import FolderView from './components/FolderView';
 
+type LegacySearchMenuSettings = {
+  engineMenuOpacity?: number;
+  engineMenuBlur?: number;
+  dropdownOpacity?: number;
+  dropdownBlur?: number;
+};
+
 const App: React.FC = () => {
   const getDefaultSettings = (): AppSettings => ({
     backgroundImage: DEFAULT_BACKGROUND,
@@ -29,9 +36,33 @@ const App: React.FC = () => {
     globalScale: 100,
     iconBackgroundOpacity: 80,
     iconBackgroundBlur: 0,
+    searchMenuOpacity: 80,
+    searchMenuBlur: 40,
     clockTextColor: '#f3f4f6',
     shortcutTextColor: '#f3f4f6'
   });
+
+  const normalizeSettings = (
+    rawSettings: Partial<AppSettings> & LegacySearchMenuSettings,
+    defaults: AppSettings
+  ): AppSettings => {
+    const {
+      engineMenuOpacity,
+      engineMenuBlur,
+      dropdownOpacity,
+      dropdownBlur,
+      ...rest
+    } = rawSettings;
+
+    return {
+      ...defaults,
+      ...rest,
+      searchMenuOpacity:
+        rawSettings.searchMenuOpacity ?? dropdownOpacity ?? engineMenuOpacity ?? defaults.searchMenuOpacity,
+      searchMenuBlur:
+        rawSettings.searchMenuBlur ?? dropdownBlur ?? engineMenuBlur ?? defaults.searchMenuBlur,
+    };
+  };
 
   // State: Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -41,8 +72,7 @@ const App: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Merge defaults with saved settings (saved settings override defaults)
-        return { ...defaults, ...parsed };
+        return normalizeSettings(parsed, defaults);
       } catch (e) {
         console.warn('Failed to parse appSettings from localStorage, using defaults.', e);
       }
@@ -62,13 +92,13 @@ const App: React.FC = () => {
 
   const handleRestoreSettings = (importedSettings: Partial<AppSettings>, engine: SearchEngineId) => {
     // Merge imported settings with current wallpaper settings
-    setSettings(prev => ({
+    setSettings(prev => normalizeSettings({
       ...prev,
       ...importedSettings,
       // Keep current wallpaper
       backgroundImage: prev.backgroundImage,
       backgroundImageId: prev.backgroundImageId
-    }));
+    }, getDefaultSettings()));
     setCurrentEngineId(engine);
   };
 
@@ -240,6 +270,8 @@ const App: React.FC = () => {
           searchBarOpacity={settings.searchBarOpacity}
           searchBarBlur={settings.searchBarBlur}
           searchBarOffsetY={settings.searchBarOffsetY}
+          searchMenuOpacity={settings.searchMenuOpacity}
+          searchMenuBlur={settings.searchMenuBlur}
         />
 
         <BookmarkGrid

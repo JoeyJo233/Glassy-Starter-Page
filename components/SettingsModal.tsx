@@ -21,6 +21,8 @@ const DEFAULT_SETTINGS: Partial<AppSettings> = {
   globalScale: 100,
   iconBackgroundOpacity: 80,
   iconBackgroundBlur: 0,
+  searchMenuOpacity: 80,
+  searchMenuBlur: 40,
   clockTextColor: '#f3f4f6',
   shortcutTextColor: '#f3f4f6',
 };
@@ -864,6 +866,37 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                   <input type="range" min="0" max="30" value={settings.iconBackgroundBlur ?? 0} onChange={(e) => onSave({...settings, iconBackgroundBlur: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                <hr className="border-gray-200" />
+                <p className="text-xs text-gray-400 -mt-2">Search Dropdowns</p>
+
+                {/* Search Menu Opacity */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Search Menus Opacity</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.searchMenuOpacity ?? 80}%</span>
+                      <button onClick={() => onSave({...settings, searchMenuOpacity: DEFAULT_SETTINGS.searchMenuOpacity!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="100" value={settings.searchMenuOpacity ?? 80} onChange={(e) => onSave({...settings, searchMenuOpacity: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Search Menu Blur */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Search Menus Blur</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.searchMenuBlur ?? 40}px</span>
+                      <button onClick={() => onSave({...settings, searchMenuBlur: DEFAULT_SETTINGS.searchMenuBlur!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="60" value={settings.searchMenuBlur ?? 40} onChange={(e) => onSave({...settings, searchMenuBlur: parseInt(e.target.value)})} className="w-full" />
                 </div>
 
                 <hr className="border-gray-200" />

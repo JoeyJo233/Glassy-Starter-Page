@@ -35,6 +35,8 @@ const defaultSettings: AppSettings = {
   globalScale: 100,
   iconBackgroundOpacity: 80,
   iconBackgroundBlur: 0,
+  searchMenuOpacity: 80,
+  searchMenuBlur: 40,
   clockTextColor: '#f3f4f6',
   shortcutTextColor: '#f3f4f6',
 };
@@ -215,7 +217,7 @@ describe('SettingsModal — Appearance Tab', () => {
   it('应该显示 Icon Background Opacity', async () => {
     await openAppearanceTab();
     expect(screen.getByText('Icon Background Opacity')).toBeInTheDocument();
-    expect(screen.getByText('80%')).toBeInTheDocument();
+    expect(screen.getAllByText('80%').length).toBeGreaterThanOrEqual(1);
   });
 
   it('应该显示 Text Colors 区域', async () => {
@@ -223,6 +225,14 @@ describe('SettingsModal — Appearance Tab', () => {
     expect(screen.getByText('Text Colors')).toBeInTheDocument();
     expect(screen.getByText('Time & Date Color')).toBeInTheDocument();
     expect(screen.getByText('Shortcut Caption Color')).toBeInTheDocument();
+  });
+
+  it('应该显示统一后的搜索菜单样式设置', async () => {
+    await openAppearanceTab();
+    expect(screen.getByText('Search Menus Opacity')).toBeInTheDocument();
+    expect(screen.getByText('Search Menus Blur')).toBeInTheDocument();
+    expect(screen.queryByText('Engine Menu Opacity')).not.toBeInTheDocument();
+    expect(screen.queryByText('Suggestions Opacity')).not.toBeInTheDocument();
   });
 
   it('修改 Icon Background Opacity 应该调用 onSave', async () => {

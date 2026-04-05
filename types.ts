@@ -38,6 +38,8 @@ export interface AppSettings {
   globalScale: number; // 50 to 150 - 全局缩放百分比
   iconBackgroundOpacity: number; // 0 to 100 - 快捷方式图标背景透明度
   iconBackgroundBlur: number; // 0 to 30 - 快捷方式图标背景模糊度 (px)
+  searchMenuOpacity: number; // 0 to 100 - 搜索菜单透明度
+  searchMenuBlur: number; // 0 to 60 - 搜索菜单模糊度 (px)
   clockTextColor: string; // 时间日期文字颜色
   shortcutTextColor: string; // 快捷方式标题文字颜色
 }
