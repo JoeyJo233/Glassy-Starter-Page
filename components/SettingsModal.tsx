@@ -182,6 +182,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // Backup/Restore State
   const bookmarksFileInputRef = useRef<HTMLInputElement>(null);
   const settingsFileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingImport, setPendingImport] = useState<BookmarkItem[] | null>(null);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<TabId>('wallpaper');
@@ -466,9 +467,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!file) return;
 
     importBookmarks(file)
-      .then((bookmarks) => {
-        onRestoreBookmarks(bookmarks);
-        alert('Bookmarks restored successfully!');
+      .then((imported) => {
+        setPendingImport(imported);
         if (bookmarksFileInputRef.current) {
           bookmarksFileInputRef.current.value = '';
         }
@@ -476,6 +476,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       .catch((error) => {
         alert(`Failed to restore bookmarks: ${error.message}`);
       });
+  };
+
+  const handleConfirmImport = (mode: 'overwrite' | 'append') => {
+    if (!pendingImport) return;
+    const next = mode === 'append' ? [...bookmarks, ...pendingImport] : pendingImport;
+    onRestoreBookmarks(next);
+    setPendingImport(null);
   };
 
   const handleExportSettings = () => {
@@ -1114,6 +1121,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                     <input ref={bookmarksFileInputRef} type="file" accept=".json" onChange={handleImportBookmarks} className="hidden" />
                   </div>
+
+                  {pendingImport && (
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                      <p className="text-xs font-medium text-amber-800">
+                        {pendingImport.length} bookmark{pendingImport.length !== 1 ? 's' : ''} ready to import. How would you like to proceed?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleConfirmImport('append')}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md border border-green-300 transition-colors"
+                        >
+                          Append
+                        </button>
+                        <button
+                          onClick={() => handleConfirmImport('overwrite')}
+                          className="flex-1 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md border border-red-300 transition-colors"
+                        >
+                          Overwrite
+                        </button>
+                        <button
+                          onClick={() => setPendingImport(null)}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-md border border-gray-300 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Settings Backup/Restore */}

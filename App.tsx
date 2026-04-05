@@ -162,6 +162,20 @@ const App: React.FC = () => {
   // Track blob URL created for the active custom wallpaper so we can revoke it on change/unmount
   const blobUrlRef = useRef<string | null>(null);
 
+  // wallpaperReady gates the initial page reveal so the wallpaper is always present on first paint
+  const [wallpaperReady, setWallpaperReady] = useState(false);
+
+  // For URL-based wallpapers: preload once on mount so the image is in cache before we reveal
+  useEffect(() => {
+    if (settings.backgroundImageId) return; // handled by the IndexedDB effect below
+    const src = settings.backgroundImage;
+    if (!src) { setWallpaperReady(true); return; }
+    const img = new Image();
+    img.onload = () => setWallpaperReady(true);
+    img.onerror = () => setWallpaperReady(true);
+    img.src = src;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Resolve custom wallpaper from IndexedDB when backgroundImageId is present
   // Note: Blob URLs don't persist across page reloads, so we must recreate them
   useEffect(() => {
@@ -173,13 +187,25 @@ const App: React.FC = () => {
         const blob = await getWallpaperBlob(settings.backgroundImageId);
         if (!blob) {
           console.warn('Wallpaper blob not found for ID:', settings.backgroundImageId);
+          setWallpaperReady(true);
           return;
         }
         const url = URL.createObjectURL(blob);
         blobUrlRef.current = url;
-        setSettings(prev => ({ ...prev, backgroundImage: url }));
+        // Preload the blob image before revealing the page
+        const img = new Image();
+        img.onload = () => {
+          setSettings(prev => ({ ...prev, backgroundImage: url }));
+          setWallpaperReady(true);
+        };
+        img.onerror = () => {
+          setSettings(prev => ({ ...prev, backgroundImage: url }));
+          setWallpaperReady(true);
+        };
+        img.src = url;
       } catch (e) {
         console.warn('Failed to resolve custom wallpaper from IndexedDB', e);
+        setWallpaperReady(true);
       }
     };
     resolveCustomWallpaper();
@@ -237,8 +263,8 @@ const App: React.FC = () => {
 
   return (
     <div
-        className="min-h-screen w-full flex flex-col items-center justify-start pt-20 relative overflow-hidden transition-all duration-700 ease-in-out bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${settings.backgroundImage})` }}
+        className="min-h-screen w-full flex flex-col items-center justify-start pt-20 relative overflow-hidden bg-cover bg-center bg-no-repeat transition-opacity duration-500 ease-in-out"
+        style={{ backgroundImage: `url(${settings.backgroundImage})`, opacity: wallpaperReady ? 1 : 0 }}
     >
       {/* Background Overlay */}
       <div

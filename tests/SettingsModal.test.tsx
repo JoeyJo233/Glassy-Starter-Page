@@ -404,6 +404,90 @@ describe('SettingsModal — Data Tab', () => {
 
     expect(exportBookmarks).toHaveBeenCalledWith([]);
   });
+
+  it('Import 成功后应显示 Append / Overwrite / Cancel 确认 UI', async () => {
+    const { importBookmarks } = await import('../utils/backup');
+    const mockImported = [{ id: 'x1', type: 'link' as const, title: 'X', url: 'https://x.com' }];
+    (importBookmarks as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockImported);
+
+    const user = userEvent.setup();
+    render(<SettingsModal {...defaultProps} />);
+    await user.click(screen.getByRole('button', { name: 'Data' }));
+
+    const fileInput = document.querySelector('input[type="file"][accept=".json"]') as HTMLInputElement;
+    const file = new File(['{}'], 'bookmarks.json', { type: 'application/json' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 bookmark ready to import/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Append' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Overwrite' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+  });
+
+  it('点击 Overwrite 应以 imported 数组调用 onRestoreBookmarks', async () => {
+    const { importBookmarks } = await import('../utils/backup');
+    const mockImported = [{ id: 'x1', type: 'link' as const, title: 'X', url: 'https://x.com' }];
+    (importBookmarks as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockImported);
+
+    const onRestoreBookmarks = vi.fn();
+    const user = userEvent.setup();
+    render(<SettingsModal {...defaultProps} onRestoreBookmarks={onRestoreBookmarks} />);
+    await user.click(screen.getByRole('button', { name: 'Data' }));
+
+    const fileInput = document.querySelector('input[type="file"][accept=".json"]') as HTMLInputElement;
+    const file = new File(['{}'], 'bookmarks.json', { type: 'application/json' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Overwrite' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Overwrite' }));
+
+    expect(onRestoreBookmarks).toHaveBeenCalledWith(mockImported);
+    expect(screen.queryByRole('button', { name: 'Append' })).not.toBeInTheDocument();
+  });
+
+  it('点击 Append 应以合并后数组调用 onRestoreBookmarks', async () => {
+    const { importBookmarks } = await import('../utils/backup');
+    const existing = [{ id: 'e1', type: 'link' as const, title: 'Existing', url: 'https://e.com' }];
+    const mockImported = [{ id: 'x1', type: 'link' as const, title: 'X', url: 'https://x.com' }];
+    (importBookmarks as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockImported);
+
+    const onRestoreBookmarks = vi.fn();
+    const user = userEvent.setup();
+    render(<SettingsModal {...defaultProps} bookmarks={existing} onRestoreBookmarks={onRestoreBookmarks} />);
+    await user.click(screen.getByRole('button', { name: 'Data' }));
+
+    const fileInput = document.querySelector('input[type="file"][accept=".json"]') as HTMLInputElement;
+    const file = new File(['{}'], 'bookmarks.json', { type: 'application/json' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Append' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Append' }));
+
+    expect(onRestoreBookmarks).toHaveBeenCalledWith([...existing, ...mockImported]);
+  });
+
+  it('点击 Cancel 应关闭确认 UI 且不调用 onRestoreBookmarks', async () => {
+    const { importBookmarks } = await import('../utils/backup');
+    const mockImported = [{ id: 'x1', type: 'link' as const, title: 'X', url: 'https://x.com' }];
+    (importBookmarks as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockImported);
+
+    const onRestoreBookmarks = vi.fn();
+    const user = userEvent.setup();
+    render(<SettingsModal {...defaultProps} onRestoreBookmarks={onRestoreBookmarks} />);
+    await user.click(screen.getByRole('button', { name: 'Data' }));
+
+    const fileInput = document.querySelector('input[type="file"][accept=".json"]') as HTMLInputElement;
+    const file = new File(['{}'], 'bookmarks.json', { type: 'application/json' });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onRestoreBookmarks).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Append' })).not.toBeInTheDocument();
+  });
 });
 
 // ─── Wallpaper Tab ─────────────────────────────────────────────────────────
