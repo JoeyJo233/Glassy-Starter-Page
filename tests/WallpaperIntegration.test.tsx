@@ -35,6 +35,10 @@ describe('Wallpaper Integration Tests', () => {
     searchBarOffsetY: -20,
     shortcutsOffsetY: -20,
     globalScale: 100,
+    iconBackgroundOpacity: 80,
+    iconBackgroundBlur: 0,
+    clockTextColor: '#f3f4f6',
+    shortcutTextColor: '#f3f4f6',
   };
 
   const mockWallpapers = [
@@ -48,6 +52,10 @@ describe('Wallpaper Integration Tests', () => {
     settings: defaultSettings,
     onSave: vi.fn(),
     onResetDefaults: vi.fn(),
+    bookmarks: [],
+    currentEngine: 'google' as const,
+    onRestoreBookmarks: vi.fn(),
+    onRestoreSettings: vi.fn(),
   };
 
   beforeEach(() => {

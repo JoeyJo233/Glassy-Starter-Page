@@ -53,12 +53,21 @@ interface CropState {
 }
 
 type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
+type TabId = 'wallpaper' | 'appearance' | 'layout' | 'search' | 'data';
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  settings, 
-  onSave, 
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'wallpaper', label: 'Wallpaper' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'layout', label: 'Layout' },
+  { id: 'search', label: 'Search' },
+  { id: 'data', label: 'Data' },
+];
+
+const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  settings,
+  onSave,
   onResetDefaults,
   bookmarks,
   currentEngine,
@@ -72,7 +81,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const MIN_MODAL_WIDTH = 320;
   const MAX_MODAL_WIDTH = 800;
   const DEFAULT_MODAL_WIDTH = 420;
-  
+
   const [modalWidth, setModalWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('settingsModalWidth');
@@ -117,11 +126,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const handleResizeMove = (e: MouseEvent) => {
       if (!isResizing) return;
       e.preventDefault();
-      
+
       // Calculate new width (dragging left edge, so width increases when moving left)
       const deltaX = resizeStartX.current - e.clientX;
       let newWidth = resizeStartWidth.current + deltaX;
-      
+
       // Clamp to min/max
       newWidth = Math.max(MIN_MODAL_WIDTH, Math.min(MAX_MODAL_WIDTH, newWidth));
       setModalWidth(newWidth);
@@ -163,12 +172,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const bookmarksFileInputRef = useRef<HTMLInputElement>(null);
   const settingsFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Tab State
+  const [activeTab, setActiveTab] = useState<TabId>('wallpaper');
+
   // Cropping State
   const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
-  
+
   // Crop Box State (relative to the displayed image pixels)
   const [crop, setCrop] = useState<CropState>({ x: 0, y: 0, width: 0, height: 0 });
-  
+
   // Dragging State
   const [isDragging, setIsDragging] = useState(false);
   const [dragMode, setDragMode] = useState<DragMode>('move');
@@ -183,7 +195,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
       const dx = e.clientX - dragStart.x;
       const dy = e.clientY - dragStart.y;
-      
+
       const imgRect = imageRef.current.getBoundingClientRect();
       const maxImgWidth = imgRect.width;
       const maxImgHeight = imgRect.height;
@@ -277,7 +289,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           setCrop({ x: newX, y: newY, width: newWidth, height: newHeight });
       }
     };
-    
+
     const handleWindowUp = () => {
       setIsDragging(false);
     };
@@ -311,16 +323,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
     const aspect = 16 / 9;
-    
+
     // Default to max possible size centered
     let boxWidth = width;
     let boxHeight = width / aspect;
-    
+
     if (boxHeight > height) {
       boxHeight = height;
       boxWidth = height * aspect;
     }
-    
+
     // Scale down slightly (90%) for better initial visual
     boxWidth *= 0.9;
     boxHeight *= 0.9;
@@ -396,14 +408,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(
-        img, 
-        crop.x * scaleX, 
-        crop.y * scaleY, 
-        crop.width * scaleX, 
-        crop.height * scaleY, 
-        0, 
-        0, 
-        targetWidth, 
+        img,
+        crop.x * scaleX,
+        crop.y * scaleY,
+        crop.width * scaleX,
+        crop.height * scaleY,
+        0,
+        0,
+        targetWidth,
         targetHeight
     );
 
@@ -484,9 +496,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       {tempImageSrc && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelCrop} />
-          
+
           <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-slide-up flex flex-col z-50 max-h-[90vh]">
-            {/* Cropper UI remains the same as before */}
             <div className="flex justify-between items-center p-4 border-b border-gray-200">
                <h3 className="text-xl font-semibold text-gray-800">Adjust Wallpaper</h3>
                <button onClick={handleCancelCrop}><X className="w-5 h-5 text-gray-500 hover:text-gray-700" /></button>
@@ -494,23 +505,23 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="flex-1 overflow-hidden bg-gray-900 flex items-center justify-center p-8 select-none">
                 <div className="relative shadow-2xl">
-                    <img 
+                    <img
                         ref={imageRef}
-                        src={tempImageSrc} 
+                        src={tempImageSrc}
                         alt="Crop Source"
                         onLoad={onImageLoad}
-                        className="max-w-full max-h-[60vh] object-contain block pointer-events-none" 
+                        className="max-w-full max-h-[60vh] object-contain block pointer-events-none"
                         draggable={false}
                     />
                     {crop.width > 0 && (
-                        <div 
+                        <div
                             className="absolute cursor-move border-2 border-blue-500 z-10"
                             style={{
                                 left: crop.x,
                                 top: crop.y,
                                 width: crop.width,
                                 height: crop.height,
-                                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)' 
+                                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)'
                             }}
                             onMouseDown={(e) => handleDragStart(e, 'move')}
                         >
@@ -523,19 +534,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 <div className="border-b border-dashed border-white/40 w-full"></div>
                             </div>
 
-                            <div 
+                            <div
                                 className="absolute -top-1.5 -left-1.5 w-4 h-4 bg-blue-500 border border-white rounded-full cursor-nw-resize z-20 hover:scale-125 transition-transform"
                                 onMouseDown={(e) => handleDragStart(e, 'nw')}
                             ></div>
-                            <div 
+                            <div
                                 className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-500 border border-white rounded-full cursor-ne-resize z-20 hover:scale-125 transition-transform"
                                 onMouseDown={(e) => handleDragStart(e, 'ne')}
                             ></div>
-                            <div 
+                            <div
                                 className="absolute -bottom-1.5 -left-1.5 w-4 h-4 bg-blue-500 border border-white rounded-full cursor-sw-resize z-20 hover:scale-125 transition-transform"
                                 onMouseDown={(e) => handleDragStart(e, 'sw')}
                             ></div>
-                            <div 
+                            <div
                                 className="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-blue-500 border border-white rounded-full cursor-se-resize z-20 hover:scale-125 transition-transform"
                                 onMouseDown={(e) => handleDragStart(e, 'se')}
                             ></div>
@@ -553,7 +564,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       )}
 
       {/* 设置侧边栏 - 从右侧滑出 */}
-      <div 
+      <div
         className={`fixed top-0 right-0 h-full bg-white/95 backdrop-blur-xl shadow-2xl transition-transform duration-300 ease-out z-50 ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
@@ -564,12 +575,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           className="absolute left-0 top-0 w-2 h-full cursor-ew-resize group z-50"
           onMouseDown={handleResizeStart}
         >
-          {/* 视觉指示条 */}
           <div className="absolute left-0 top-0 w-1 h-full bg-transparent group-hover:bg-blue-400/50 transition-colors" />
-          {/* 中间拖拽指示器 */}
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-gray-300 group-hover:bg-blue-500 rounded-r-full opacity-0 group-hover:opacity-100 transition-all" />
         </div>
+
         <div className="flex flex-col h-full">
+          {/* Header */}
           <div className="flex items-center justify-between p-5 border-b border-gray-200/50">
             <h2 className="text-xl font-semibold text-gray-800">Settings</h2>
             <div className="flex items-center space-x-2">
@@ -585,99 +596,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            
-            {/* Presets */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Preset Backgrounds</label>
-                <div className="grid grid-cols-3 gap-3 mb-4">
-                {PRESET_BACKGROUNDS.map((url, idx) => (
-                    <button
-                    key={idx}
-                  onClick={() => onSave({ ...settings, backgroundImage: url, backgroundImageId: undefined })}
-                    className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all group ${settings.backgroundImage === url ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
-                    >
-                    <img src={url} className="w-full h-full object-cover" alt="preset" />
-                    </button>
-                ))}
-                </div>
-            </div>
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-200/50 px-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-3 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Custom Wallpapers */}
-            <div>
-                 <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">My Wallpapers</label>
-                    <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="text-xs flex items-center text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                        <Upload className="w-3 h-3 mr-1" />
-                        Upload New
-                    </button>
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                 </div>
-
-                 {customWallpapers.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-3">
-                    {customWallpapers.map((item, idx) => (
-                      <div 
-                        key={item.id}
-                        onClick={() => onSave({ ...settings, backgroundImage: item.url, backgroundImageId: item.id })}
-                        className={`relative aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${settings.backgroundImageId === item.id ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
-                      >
-                        <img src={item.url} className="w-full h-full object-cover" alt={item.name || 'custom'} />
-                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                const { getWallpaperBlob } = await import('../utils/wallpaperStore');
-                                const blob = await getWallpaperBlob(item.id);
-                                if (!blob) return;
-                                const url = URL.createObjectURL(blob);
-                                const link = document.createElement('a');
-                                link.href = url;
-                                link.download = item.name || `wallpaper-${idx + 1}.png`;
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                URL.revokeObjectURL(url);
-                              } catch (err) {
-                                console.warn('Failed to download wallpaper', err);
-                              }
-                            }}
-                            className="p-1 bg-black/50 hover:bg-blue-500 rounded text-white transition-colors"
-                            title="Download wallpaper"
-                          >
-                            <Download className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteCustom(e, item.id)}
-                            className="p-1 bg-black/50 hover:bg-red-500 rounded text-white transition-colors"
-                            title="Delete wallpaper"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                 ) : (
-                    <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full h-24 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-gray-400 cursor-pointer transition-colors"
-                    >
-                        <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
-                        <span className="text-sm">Click to upload image</span>
-                    </div>
-                 )}
-            </div>
-
-            <hr className="border-gray-200" />
-
-            {/* Appearance Controls */}
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-6">
             <style>{`
-              /* 滑块样式优化 */
               input[type='range'] {
                 -webkit-appearance: none;
                 appearance: none;
@@ -685,23 +623,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 cursor: pointer;
                 height: 20px;
               }
-              
-              /* 轨道样式 */
               input[type='range']::-webkit-slider-runnable-track {
                 height: 8px;
                 background: linear-gradient(to right, #3b82f6 0%, #8b5cf6 100%);
                 border-radius: 9999px;
                 box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
               }
-              
               input[type='range']::-moz-range-track {
                 height: 8px;
                 background: linear-gradient(to right, #3b82f6 0%, #8b5cf6 100%);
                 border-radius: 9999px;
                 box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
               }
-              
-              /* 滑块按钮样式 */
               input[type='range']::-webkit-slider-thumb {
                 -webkit-appearance: none;
                 appearance: none;
@@ -715,7 +648,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 transition: all 0.2s ease;
                 margin-top: -6px;
               }
-              
               input[type='range']::-moz-range-thumb {
                 height: 20px;
                 width: 20px;
@@ -727,552 +659,447 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 transition: all 0.2s ease;
                 border: none;
               }
-              
-              /* 悬停效果 */
               input[type='range']::-webkit-slider-thumb:hover {
                 transform: scale(1.2);
                 box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6), 0 0 0 2px rgba(59, 130, 246, 0.2);
               }
-              
               input[type='range']::-moz-range-thumb:hover {
                 transform: scale(1.2);
                 box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6), 0 0 0 2px rgba(59, 130, 246, 0.2);
               }
-              
-              /* 激活效果 */
               input[type='range']:active::-webkit-slider-thumb {
                 transform: scale(1.1);
                 box-shadow: 0 2px 6px rgba(59, 130, 246, 0.5), 0 0 0 3px rgba(59, 130, 246, 0.3);
               }
-              
               input[type='range']:active::-moz-range-thumb {
                 transform: scale(1.1);
                 box-shadow: 0 2px 6px rgba(59, 130, 246, 0.5), 0 0 0 3px rgba(59, 130, 246, 0.3);
               }
             `}</style>
-            <div className="space-y-5">
-                <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Global Scale</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
-                            <button
-                                onClick={() => onSave({...settings, globalScale: DEFAULT_SETTINGS.globalScale})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="50"
-                    max="150"
-                    value={settings.globalScale ?? 100}
-                    onChange={(e) => onSave({...settings, globalScale: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Overlay Opacity</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
-                            <button
-                                onClick={() => onSave({...settings, opacityLevel: DEFAULT_SETTINGS.opacityLevel!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={settings.opacityLevel}
-                    onChange={(e) => onSave({...settings, opacityLevel: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Blur Amount</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.blurLevel}px</span>
-                            <button
-                                onClick={() => onSave({...settings, blurLevel: DEFAULT_SETTINGS.blurLevel!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="0"
-                    max="20"
-                    value={settings.blurLevel}
-                    onChange={(e) => onSave({...settings, blurLevel: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                 <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Max Search History</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.maxHistoryItems} items</span>
-                            <button
-                                onClick={() => onSave({...settings, maxHistoryItems: DEFAULT_SETTINGS.maxHistoryItems!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={settings.maxHistoryItems ?? 5}
-                    onChange={(e) => onSave({...settings, maxHistoryItems: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                 <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Max Search Suggestions</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.maxSuggestions} items</span>
-                            <button
-                                onClick={() => onSave({...settings, maxSuggestions: DEFAULT_SETTINGS.maxSuggestions!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={settings.maxSuggestions ?? 5}
-                    onChange={(e) => onSave({...settings, maxSuggestions: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-            </div>
 
-            <hr className="border-gray-200" />
-
-            {/* Search Bar & Clock Controls */}
-            <div className="space-y-5">
+            {/* ── Wallpaper Tab ── */}
+            {activeTab === 'wallpaper' && (
+              <div className="space-y-6">
+                {/* Preset Backgrounds */}
                 <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Search Bar Opacity</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.searchBarOpacity ?? 40}%</span>
-                            <button
-                                onClick={() => onSave({...settings, searchBarOpacity: DEFAULT_SETTINGS.searchBarOpacity!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                min="0"
-                max="100"
-                    value={settings.searchBarOpacity ?? 40}
-                    onChange={(e) => onSave({...settings, searchBarOpacity: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Search Bar Blur</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.searchBarBlur ?? 24}px</span>
-                            <button
-                                onClick={() => onSave({...settings, searchBarBlur: DEFAULT_SETTINGS.searchBarBlur!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                min="0"
-                max="30"
-                    value={settings.searchBarBlur ?? 24}
-                    onChange={(e) => onSave({...settings, searchBarBlur: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Icon Background Opacity</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.iconBackgroundOpacity ?? 80}%</span>
-                            <button
-                                onClick={() => onSave({...settings, iconBackgroundOpacity: DEFAULT_SETTINGS.iconBackgroundOpacity!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                min="0"
-                max="100"
-                    value={settings.iconBackgroundOpacity ?? 80}
-                    onChange={(e) => onSave({...settings, iconBackgroundOpacity: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-                <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Icon Background Blur</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.iconBackgroundBlur ?? 0}px</span>
-                            <button
-                                onClick={() => onSave({...settings, iconBackgroundBlur: DEFAULT_SETTINGS.iconBackgroundBlur!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                            </button>
-                        </div>
-                    </div>
-                    <input
-                    type="range"
-                min="0"
-                max="30"
-                    value={settings.iconBackgroundBlur ?? 0}
-                    onChange={(e) => onSave({...settings, iconBackgroundBlur: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                </div>
-              <div>
-                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                  <label>Time Position</label>
-                  <div className="flex items-center gap-2">
-                      <span className="text-blue-600 font-semibold">{settings.timeOffsetY ?? 0}px</span>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Preset Backgrounds</label>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {PRESET_BACKGROUNDS.map((url, idx) => (
                       <button
-                          onClick={() => onSave({...settings, timeOffsetY: DEFAULT_SETTINGS.timeOffsetY!})}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors"
-                          title="Reset to default"
+                        key={idx}
+                        onClick={() => onSave({ ...settings, backgroundImage: url, backgroundImageId: undefined })}
+                        className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all group ${settings.backgroundImage === url ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
                       >
-                          <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                        <img src={url} className="w-full h-full object-cover" alt="preset" />
                       </button>
+                    ))}
                   </div>
                 </div>
-                <input
-                type="range"
-                min="-100"
-                max="200"
-                value={settings.timeOffsetY ?? 0}
-                onChange={(e) => onSave({...settings, timeOffsetY: parseInt(e.target.value)})}
-                className="w-full"
-                />
-              </div>
+
+                {/* Custom Wallpapers */}
                 <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                        <label>Time Font Size</label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-blue-600 font-semibold">{settings.timeFontSize ?? 96}px</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">My Wallpapers</label>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-xs flex items-center text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      <Upload className="w-3 h-3 mr-1" />
+                      Upload New
+                    </button>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                  </div>
+
+                  {isLoadingWallpapers ? (
+                    <div className="w-full h-24 flex items-center justify-center text-gray-400 text-sm">Loading...</div>
+                  ) : customWallpapers.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {customWallpapers.map((item, idx) => (
+                        <div
+                          key={item.id}
+                          onClick={() => onSave({ ...settings, backgroundImage: item.url, backgroundImageId: item.id })}
+                          className={`relative aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all group ${settings.backgroundImageId === item.id ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-transparent hover:border-gray-300'}`}
+                        >
+                          <img src={item.url} className="w-full h-full object-cover" alt={item.name || 'custom'} />
+                          <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                                onClick={() => onSave({...settings, timeFontSize: DEFAULT_SETTINGS.timeFontSize!})}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                title="Reset to default"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const { getWallpaperBlob } = await import('../utils/wallpaperStore');
+                                  const blob = await getWallpaperBlob(item.id);
+                                  if (!blob) return;
+                                  const url = URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = item.name || `wallpaper-${idx + 1}.png`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  URL.revokeObjectURL(url);
+                                } catch (err) {
+                                  console.warn('Failed to download wallpaper', err);
+                                }
+                              }}
+                              className="p-1 bg-black/50 hover:bg-blue-500 rounded text-white transition-colors"
+                              title="Download wallpaper"
                             >
-                                <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                              <Download className="w-3 h-3" />
                             </button>
+                            <button
+                              onClick={(e) => handleDeleteCustom(e, item.id)}
+                              className="p-1 bg-black/50 hover:bg-red-500 rounded text-white transition-colors"
+                              title="Delete wallpaper"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
+                      ))}
                     </div>
-                    <input
-                    type="range"
-                    min="40"
-                    max="160"
-                    value={settings.timeFontSize ?? 96}
-                    onChange={(e) => onSave({...settings, timeFontSize: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full h-24 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:bg-gray-50 hover:border-gray-400 cursor-pointer transition-colors"
+                    >
+                      <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
+                      <span className="text-sm">Click to upload image</span>
+                    </div>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {/* ── Appearance Tab ── */}
+            {activeTab === 'appearance' && (
+              <div className="space-y-5">
+                {/* Overlay Opacity */}
                 <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                      <label>Date Position</label>
-                      <div className="flex items-center gap-2">
-                          <span className="text-blue-600 font-semibold">{settings.dateOffsetY ?? 0}px</span>
-                          <button
-                              onClick={() => onSave({...settings, dateOffsetY: DEFAULT_SETTINGS.dateOffsetY!})}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                              title="Reset to default"
-                          >
-                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                          </button>
-                      </div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Overlay Opacity</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.opacityLevel}%</span>
+                      <button onClick={() => onSave({...settings, opacityLevel: DEFAULT_SETTINGS.opacityLevel!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
                     </div>
-                    <input
-                    type="range"
-                    min="-100"
-                    max="200"
-                    value={settings.dateOffsetY ?? 0}
-                    onChange={(e) => onSave({...settings, dateOffsetY: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
+                  </div>
+                  <input type="range" min="0" max="100" value={settings.opacityLevel} onChange={(e) => onSave({...settings, opacityLevel: parseInt(e.target.value)})} className="w-full" />
                 </div>
-                  <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                      <label>Date Font Size</label>
-                      <div className="flex items-center gap-2">
-                          <span className="text-blue-600 font-semibold">{settings.dateFontSize ?? 24}px</span>
-                          <button
-                              onClick={() => onSave({...settings, dateFontSize: DEFAULT_SETTINGS.dateFontSize!})}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                              title="Reset to default"
-                          >
-                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                          </button>
-                      </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="12"
-                    max="48"
-                    value={settings.dateFontSize ?? 24}
-                    onChange={(e) => onSave({...settings, dateFontSize: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                      <label>Search Bar Position</label>
-                      <div className="flex items-center gap-2">
-                          <span className="text-blue-600 font-semibold">{settings.searchBarOffsetY ?? 0}px</span>
-                          <button
-                              onClick={() => onSave({...settings, searchBarOffsetY: DEFAULT_SETTINGS.searchBarOffsetY!})}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                              title="Reset to default"
-                          >
-                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                          </button>
-                      </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="-100"
-                    max="200"
-                    value={settings.searchBarOffsetY ?? 0}
-                    onChange={(e) => onSave({...settings, searchBarOffsetY: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                      <label>Shortcuts Position</label>
-                      <div className="flex items-center gap-2">
-                          <span className="text-blue-600 font-semibold">{settings.shortcutsOffsetY ?? 0}px</span>
-                          <button
-                              onClick={() => onSave({...settings, shortcutsOffsetY: DEFAULT_SETTINGS.shortcutsOffsetY!})}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                              title="Reset to default"
-                          >
-                              <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                          </button>
-                      </div>
-                    </div>
-                    <input
-                    type="range"
-                    min="-100"
-                    max="200"
-                    value={settings.shortcutsOffsetY ?? 0}
-                    onChange={(e) => onSave({...settings, shortcutsOffsetY: parseInt(e.target.value)})}
-                    className="w-full"
-                    />
-                  </div>
-            </div>
 
-            <hr className="border-gray-200" />
-
-            {/* Text Colors Section */}
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-gray-800 mb-3">Text Colors</h3>
-              
-              {/* Clock Text Color */}
-              <div>
-                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                  <label>Time & Date Color</label>
-                  <button
-                    onClick={() => onSave({...settings, clockTextColor: DEFAULT_SETTINGS.clockTextColor!})}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    title="Reset to default"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                  </button>
+                {/* Blur Amount */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Blur Amount</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.blurLevel}px</span>
+                      <button onClick={() => onSave({...settings, blurLevel: DEFAULT_SETTINGS.blurLevel!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="20" value={settings.blurLevel} onChange={(e) => onSave({...settings, blurLevel: parseInt(e.target.value)})} className="w-full" />
                 </div>
-                <div className="flex gap-2 items-center">
-                  {/* Preset colors */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => onSave({...settings, clockTextColor: '#ffffff'})}
-                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                      style={{ backgroundColor: '#ffffff' }}
-                      title="White"
-                    />
-                    <button
-                      onClick={() => onSave({...settings, clockTextColor: '#9ca3af'})}
-                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                      style={{ backgroundColor: '#9ca3af' }}
-                      title="Gray"
-                    />
-                    <button
-                      onClick={() => onSave({...settings, clockTextColor: '#000000'})}
-                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                      style={{ backgroundColor: '#000000' }}
-                      title="Black"
-                    />
+
+                {/* Search Bar Opacity */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Search Bar Opacity</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.searchBarOpacity ?? 40}%</span>
+                      <button onClick={() => onSave({...settings, searchBarOpacity: DEFAULT_SETTINGS.searchBarOpacity!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
                   </div>
-                  {/* Color picker */}
-                  <input
-                    type="color"
-                    value={settings.clockTextColor ?? '#f3f4f6'}
-                    onChange={(e) => onSave({...settings, clockTextColor: e.target.value})}
-                    className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer"
-                  />
-                  <span className="text-xs text-gray-500 ml-2">{settings.clockTextColor ?? '#f3f4f6'}</span>
+                  <input type="range" min="0" max="100" value={settings.searchBarOpacity ?? 40} onChange={(e) => onSave({...settings, searchBarOpacity: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Search Bar Blur */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Search Bar Blur</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.searchBarBlur ?? 24}px</span>
+                      <button onClick={() => onSave({...settings, searchBarBlur: DEFAULT_SETTINGS.searchBarBlur!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="30" value={settings.searchBarBlur ?? 24} onChange={(e) => onSave({...settings, searchBarBlur: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Icon Background Opacity */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Icon Background Opacity</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.iconBackgroundOpacity ?? 80}%</span>
+                      <button onClick={() => onSave({...settings, iconBackgroundOpacity: DEFAULT_SETTINGS.iconBackgroundOpacity!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="100" value={settings.iconBackgroundOpacity ?? 80} onChange={(e) => onSave({...settings, iconBackgroundOpacity: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Icon Background Blur */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Icon Background Blur</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.iconBackgroundBlur ?? 0}px</span>
+                      <button onClick={() => onSave({...settings, iconBackgroundBlur: DEFAULT_SETTINGS.iconBackgroundBlur!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="30" value={settings.iconBackgroundBlur ?? 0} onChange={(e) => onSave({...settings, iconBackgroundBlur: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                <hr className="border-gray-200" />
+
+                {/* Text Colors */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-700">Text Colors</h3>
+
+                  {/* Clock Text Color */}
+                  <div>
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                      <label>Time & Date Color</label>
+                      <button onClick={() => onSave({...settings, clockTextColor: DEFAULT_SETTINGS.clockTextColor!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <div className="flex gap-2">
+                        <button onClick={() => onSave({...settings, clockTextColor: '#ffffff'})} className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors" style={{ backgroundColor: '#ffffff' }} title="White" />
+                        <button onClick={() => onSave({...settings, clockTextColor: '#9ca3af'})} className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors" style={{ backgroundColor: '#9ca3af' }} title="Gray" />
+                        <button onClick={() => onSave({...settings, clockTextColor: '#000000'})} className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors" style={{ backgroundColor: '#000000' }} title="Black" />
+                      </div>
+                      <input type="color" value={settings.clockTextColor ?? '#f3f4f6'} onChange={(e) => onSave({...settings, clockTextColor: e.target.value})} className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer" />
+                      <span className="text-xs text-gray-500 ml-2">{settings.clockTextColor ?? '#f3f4f6'}</span>
+                    </div>
+                  </div>
+
+                  {/* Shortcut Text Color */}
+                  <div>
+                    <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                      <label>Shortcut Caption Color</label>
+                      <button onClick={() => onSave({...settings, shortcutTextColor: DEFAULT_SETTINGS.shortcutTextColor!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <div className="flex gap-2">
+                        <button onClick={() => onSave({...settings, shortcutTextColor: '#ffffff'})} className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors" style={{ backgroundColor: '#ffffff' }} title="White" />
+                        <button onClick={() => onSave({...settings, shortcutTextColor: '#9ca3af'})} className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors" style={{ backgroundColor: '#9ca3af' }} title="Gray" />
+                        <button onClick={() => onSave({...settings, shortcutTextColor: '#000000'})} className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors" style={{ backgroundColor: '#000000' }} title="Black" />
+                      </div>
+                      <input type="color" value={settings.shortcutTextColor ?? '#f3f4f6'} onChange={(e) => onSave({...settings, shortcutTextColor: e.target.value})} className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer" />
+                      <span className="text-xs text-gray-500 ml-2">{settings.shortcutTextColor ?? '#f3f4f6'}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Shortcut Text Color */}
-              <div>
-                <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
-                  <label>Shortcut Caption Color</label>
-                  <button
-                    onClick={() => onSave({...settings, shortcutTextColor: DEFAULT_SETTINGS.shortcutTextColor!})}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    title="Reset to default"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
-                  </button>
-                </div>
-                <div className="flex gap-2 items-center">
-                  {/* Preset colors */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => onSave({...settings, shortcutTextColor: '#ffffff'})}
-                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                      style={{ backgroundColor: '#ffffff' }}
-                      title="White"
-                    />
-                    <button
-                      onClick={() => onSave({...settings, shortcutTextColor: '#9ca3af'})}
-                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                      style={{ backgroundColor: '#9ca3af' }}
-                      title="Gray"
-                    />
-                    <button
-                      onClick={() => onSave({...settings, shortcutTextColor: '#000000'})}
-                      className="w-8 h-8 rounded border-2 border-gray-300 hover:border-blue-500 transition-colors"
-                      style={{ backgroundColor: '#000000' }}
-                      title="Black"
-                    />
+            {/* ── Layout Tab ── */}
+            {activeTab === 'layout' && (
+              <div className="space-y-5">
+                {/* Global Scale */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Global Scale</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.globalScale ?? 100}%</span>
+                      <button onClick={() => onSave({...settings, globalScale: DEFAULT_SETTINGS.globalScale})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
                   </div>
-                  {/* Color picker */}
-                  <input
-                    type="color"
-                    value={settings.shortcutTextColor ?? '#f3f4f6'}
-                    onChange={(e) => onSave({...settings, shortcutTextColor: e.target.value})}
-                    className="w-12 h-8 rounded border-2 border-gray-300 cursor-pointer"
-                  />
-                  <span className="text-xs text-gray-500 ml-2">{settings.shortcutTextColor ?? '#f3f4f6'}</span>
+                  <input type="range" min="50" max="150" value={settings.globalScale ?? 100} onChange={(e) => onSave({...settings, globalScale: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                <hr className="border-gray-200" />
+                <p className="text-xs text-gray-400 -mt-2">Clock</p>
+
+                {/* Time Position */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Time Position</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.timeOffsetY ?? 0}px</span>
+                      <button onClick={() => onSave({...settings, timeOffsetY: DEFAULT_SETTINGS.timeOffsetY!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="-100" max="200" value={settings.timeOffsetY ?? 0} onChange={(e) => onSave({...settings, timeOffsetY: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Time Font Size */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Time Font Size</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.timeFontSize ?? 96}px</span>
+                      <button onClick={() => onSave({...settings, timeFontSize: DEFAULT_SETTINGS.timeFontSize!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="40" max="160" value={settings.timeFontSize ?? 96} onChange={(e) => onSave({...settings, timeFontSize: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Date Position */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Date Position</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.dateOffsetY ?? 0}px</span>
+                      <button onClick={() => onSave({...settings, dateOffsetY: DEFAULT_SETTINGS.dateOffsetY!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="-100" max="200" value={settings.dateOffsetY ?? 0} onChange={(e) => onSave({...settings, dateOffsetY: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Date Font Size */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Date Font Size</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.dateFontSize ?? 24}px</span>
+                      <button onClick={() => onSave({...settings, dateFontSize: DEFAULT_SETTINGS.dateFontSize!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="12" max="48" value={settings.dateFontSize ?? 24} onChange={(e) => onSave({...settings, dateFontSize: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                <hr className="border-gray-200" />
+                <p className="text-xs text-gray-400 -mt-2">Search & Shortcuts</p>
+
+                {/* Search Bar Position */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Search Bar Position</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.searchBarOffsetY ?? 0}px</span>
+                      <button onClick={() => onSave({...settings, searchBarOffsetY: DEFAULT_SETTINGS.searchBarOffsetY!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="-100" max="200" value={settings.searchBarOffsetY ?? 0} onChange={(e) => onSave({...settings, searchBarOffsetY: parseInt(e.target.value)})} className="w-full" />
+                </div>
+
+                {/* Shortcuts Position */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Shortcuts Position</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.shortcutsOffsetY ?? 0}px</span>
+                      <button onClick={() => onSave({...settings, shortcutsOffsetY: DEFAULT_SETTINGS.shortcutsOffsetY!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="-100" max="200" value={settings.shortcutsOffsetY ?? 0} onChange={(e) => onSave({...settings, shortcutsOffsetY: parseInt(e.target.value)})} className="w-full" />
                 </div>
               </div>
-            </div>
+            )}
 
-            <hr className="border-gray-200" />
+            {/* ── Search Tab ── */}
+            {activeTab === 'search' && (
+              <div className="space-y-5">
+                {/* Max Search History */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Max Search History</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.maxHistoryItems} items</span>
+                      <button onClick={() => onSave({...settings, maxHistoryItems: DEFAULT_SETTINGS.maxHistoryItems!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="10" value={settings.maxHistoryItems ?? 5} onChange={(e) => onSave({...settings, maxHistoryItems: parseInt(e.target.value)})} className="w-full" />
+                </div>
 
-            {/* Backup & Restore Section */}
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold text-gray-800 mb-3">Backup & Restore</h3>
-              
-              {/* Bookmarks Backup/Restore */}
-              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                {/* Max Search Suggestions */}
+                <div>
+                  <div className="flex justify-between items-center text-sm font-medium text-gray-700 mb-2">
+                    <label>Max Search Suggestions</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-600 font-semibold">{settings.maxSuggestions} items</span>
+                      <button onClick={() => onSave({...settings, maxSuggestions: DEFAULT_SETTINGS.maxSuggestions!})} className="p-1 hover:bg-gray-100 rounded transition-colors" title="Reset to default">
+                        <RotateCcw className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0" max="10" value={settings.maxSuggestions ?? 5} onChange={(e) => onSave({...settings, maxSuggestions: parseInt(e.target.value)})} className="w-full" />
+                </div>
+              </div>
+            )}
+
+            {/* ── Data Tab ── */}
+            {activeTab === 'data' && (
+              <div className="space-y-4">
+                {/* Bookmarks Backup/Restore */}
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Bookmarks</h4>
                     <p className="text-xs text-gray-500 mt-0.5">Export or import all shortcuts and folders</p>
                   </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportBookmarks}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      Export
+                    </button>
+                    <button
+                      onClick={() => bookmarksFileInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                    >
+                      <FileUp className="w-4 h-4" />
+                      Import
+                    </button>
+                    <input ref={bookmarksFileInputRef} type="file" accept=".json" onChange={handleImportBookmarks} className="hidden" />
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExportBookmarks}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
-                  >
-                    <FileDown className="w-4 h-4" />
-                    Export
-                  </button>
-                  <button
-                    onClick={() => bookmarksFileInputRef.current?.click()}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
-                  >
-                    <FileUp className="w-4 h-4" />
-                    Import
-                  </button>
-                  <input
-                    ref={bookmarksFileInputRef}
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportBookmarks}
-                    className="hidden"
-                  />
-                </div>
-              </div>
 
-              {/* Settings Backup/Restore */}
-              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
+                {/* Settings Backup/Restore */}
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <div>
                     <h4 className="text-sm font-medium text-gray-700">Settings</h4>
                     <p className="text-xs text-gray-500 mt-0.5">Export or import all settings (wallpaper excluded)</p>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExportSettings}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
-                  >
-                    <FileDown className="w-4 h-4" />
-                    Export
-                  </button>
-                  <button
-                    onClick={() => settingsFileInputRef.current?.click()}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
-                  >
-                    <FileUp className="w-4 h-4" />
-                    Import
-                  </button>
-                  <input
-                    ref={settingsFileInputRef}
-                    type="file"
-                    accept=".json"
-                    onChange={handleImportSettings}
-                    className="hidden"
-                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportSettings}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      Export
+                    </button>
+                    <button
+                      onClick={() => settingsFileInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors"
+                    >
+                      <FileUp className="w-4 h-4" />
+                      Import
+                    </button>
+                    <input ref={settingsFileInputRef} type="file" accept=".json" onChange={handleImportSettings} className="hidden" />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
