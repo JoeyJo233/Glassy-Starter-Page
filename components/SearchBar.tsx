@@ -48,6 +48,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const engineButtonRef = useRef<HTMLDivElement>(null);
   const engineDropdownRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const suggestCacheRef = useRef<Map<string, string[]>>(new Map());
 
   const currentEngine = SEARCH_ENGINES.find(e => e.id === currentEngineId) || SEARCH_ENGINES[0];
 
@@ -68,56 +70,67 @@ const SearchBar: React.FC<SearchBarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch suggestions with debounce
+  // Fetch suggestions with debounce, AbortController, and per-engine cache
   useEffect(() => {
     const fetchSuggestions = async () => {
-        // Clear suggestions if query is empty or disabled
         if (!query.trim() || maxSuggestions === 0 || !currentEngine.suggestionUrl) {
             setSuggestions([]);
             return;
         }
 
+        const cacheKey = `${currentEngine.id}:${query}`;
+        const cached = suggestCacheRef.current.get(cacheKey);
+        if (cached) {
+            setSuggestions(cached);
+            return;
+        }
+
+        // Cancel any in-flight request before starting a new one
+        abortControllerRef.current?.abort();
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         try {
-            // 构建建议 API URL
             let apiUrl = `${currentEngine.suggestionUrl}${encodeURIComponent(query)}`;
-            
-            // 如果需要使用 CORS 代理
             if (currentEngine.useCorsProxy) {
                 apiUrl = `${CORS_PROXY}${encodeURIComponent(apiUrl)}`;
             }
 
-            const response = await fetch(apiUrl);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            const response = await fetch(apiUrl, { signal: controller.signal });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
             const data = await response.json();
-            
             let parsed: string[] = [];
-
-            // 统一解析：所有搜索引擎都使用 OpenSearch 格式
-            // 格式: [query, [suggestion1, suggestion2, ...], ...]
             if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
                 parsed = data[1] as string[];
             } else {
                 console.warn('Unexpected API response format:', data);
             }
 
-            setSuggestions(parsed.slice(0, maxSuggestions));
+            const result = parsed.slice(0, maxSuggestions);
+            // Cap cache at 100 entries to prevent unbounded growth
+            if (suggestCacheRef.current.size >= 100) {
+                const firstKey = suggestCacheRef.current.keys().next().value as string;
+                suggestCacheRef.current.delete(firstKey);
+            }
+            suggestCacheRef.current.set(cacheKey, result);
+            setSuggestions(result);
 
         } catch (e) {
+            if ((e as Error).name === 'AbortError') return; // expected — don't update state
             console.error("获取搜索建议失败:", e);
             setSuggestions([]);
         }
     };
 
-    const timer = setTimeout(() => {
-        fetchSuggestions();
-    }, 300); // 300ms 防抖
-
+    const timer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(timer);
   }, [query, currentEngine.id, currentEngine.suggestionUrl, currentEngine.useCorsProxy, maxSuggestions]);
+
+  // Abort any pending request on unmount
+  useEffect(() => {
+    return () => { abortControllerRef.current?.abort(); };
+  }, []);
 
   // Reset selected index when query or suggestions change
   useEffect(() => {
@@ -207,7 +220,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
               aria-label={`Select search engine: ${currentEngine.name}`}
               aria-expanded={showEngineMenu}
             >
-              <img src={currentEngine.icon} alt={currentEngine.name} className="w-6 h-6 rounded-sm" />
+              <img src={currentEngine.icon} alt={currentEngine.name} className="w-6 h-6 rounded-sm" onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
               <ChevronDown className="w-4 h-4 ml-1 opacity-60" style={{ color: iconColor }} />
             </button>
           </div>
@@ -258,7 +271,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                   engine.id === currentEngineId ? 'bg-black/5' : ''
                 }`}
               >
-                <img src={engine.icon} alt={engine.name} className="w-5 h-5 mr-3 opacity-80" />
+                <img src={engine.icon} alt={engine.name} className="w-5 h-5 mr-3 opacity-80" onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
                 <span className="text-gray-700 font-medium">{engine.name}</span>
               </button>
             ))}

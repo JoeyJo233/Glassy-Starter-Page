@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { BookmarkItem, SearchEngineId, AppSettings } from './types';
 import { DEFAULT_BACKGROUND, INITIAL_BOOKMARKS } from './constants';
@@ -6,9 +6,10 @@ import { DEFAULT_BACKGROUND, INITIAL_BOOKMARKS } from './constants';
 import Clock from './components/Clock';
 import SearchBar from './components/SearchBar';
 import BookmarkGrid from './components/BookmarkGrid';
-import SettingsModal from './components/SettingsModal';
-import EditItemModal from './components/EditItemModal';
-import FolderView from './components/FolderView';
+
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const EditItemModal = lazy(() => import('./components/EditItemModal'));
+const FolderView = lazy(() => import('./components/FolderView'));
 
 type LegacySearchMenuSettings = {
   engineMenuOpacity?: number;
@@ -121,19 +122,28 @@ const App: React.FC = () => {
 
   // State: UI
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsEverOpened, setSettingsEverOpened] = useState(false);
   const [editItem, setEditItem] = useState<{item: BookmarkItem | null, parentId?: string} | null>(null);
   const [openFolder, setOpenFolder] = useState<BookmarkItem | null>(null);
 
-  // Persistence Effects - wrap with try/catch to avoid crashes (especially for large base64 wallpapers)
-  useEffect(() => {
+  // Refs to hold the latest values for flushing on pagehide
+  const latestSettingsRef = useRef(settings);
+  const latestItemsRef = useRef(items);
+  latestSettingsRef.current = settings;
+  latestItemsRef.current = items;
+
+  // Debounce timers for localStorage writes
+  const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bookmarksTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistSettings = (s: AppSettings) => {
     try {
-      localStorage.setItem('appSettings', JSON.stringify(settings));
+      localStorage.setItem('appSettings', JSON.stringify(s));
     } catch (e) {
       console.warn('Failed to persist appSettings (possibly quota exceeded).', e);
-      // Fallback: try to persist without backgroundImage if it is a large data URL
-      if (settings.backgroundImage?.startsWith('data:')) {
+      if (s.backgroundImage?.startsWith('data:')) {
         try {
-          const { backgroundImage, ...rest } = settings;
+          const { backgroundImage, ...rest } = s;
           localStorage.setItem('appSettings', JSON.stringify(rest));
           console.warn('Persisted appSettings without backgroundImage to avoid quota issues.');
         } catch (err) {
@@ -141,23 +151,54 @@ const App: React.FC = () => {
         }
       }
     }
+  };
+
+  // Debounced settings persistence (500 ms)
+  useEffect(() => {
+    if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
+    settingsTimerRef.current = setTimeout(() => persistSettings(settings), 500);
+    return () => { if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current); };
   }, [settings]);
 
+  // Debounced bookmarks persistence (300 ms)
   useEffect(() => {
-    try {
-      localStorage.setItem('bookmarks', JSON.stringify(items));
-    } catch (e) {
-      console.warn('Failed to persist bookmarks.', e);
-    }
+    if (bookmarksTimerRef.current) clearTimeout(bookmarksTimerRef.current);
+    bookmarksTimerRef.current = setTimeout(() => {
+      try { localStorage.setItem('bookmarks', JSON.stringify(items)); }
+      catch (e) { console.warn('Failed to persist bookmarks.', e); }
+    }, 300);
+    return () => { if (bookmarksTimerRef.current) clearTimeout(bookmarksTimerRef.current); };
   }, [items]);
 
+  // currentEngine: immediate (changes rarely, tiny payload)
   useEffect(() => {
-    try {
-      localStorage.setItem('currentEngine', currentEngineId);
-    } catch (e) {
-      console.warn('Failed to persist currentEngine.', e);
-    }
+    try { localStorage.setItem('currentEngine', currentEngineId); }
+    catch (e) { console.warn('Failed to persist currentEngine.', e); }
   }, [currentEngineId]);
+
+  // Flush pending debounced writes when the page is hidden or unloaded
+  useEffect(() => {
+    const flush = () => {
+      if (settingsTimerRef.current) {
+        clearTimeout(settingsTimerRef.current);
+        settingsTimerRef.current = null;
+        persistSettings(latestSettingsRef.current);
+      }
+      if (bookmarksTimerRef.current) {
+        clearTimeout(bookmarksTimerRef.current);
+        bookmarksTimerRef.current = null;
+        try { localStorage.setItem('bookmarks', JSON.stringify(latestItemsRef.current)); }
+        catch (e) { console.warn('Failed to flush bookmarks.', e); }
+      }
+    };
+    const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   // Track blob URL created for the active custom wallpaper so we can revoke it on change/unmount
   const blobUrlRef = useRef<string | null>(null);
@@ -262,13 +303,16 @@ const App: React.FC = () => {
   };
 
   return (
-    <div
-        className="min-h-screen w-full flex flex-col items-center justify-start pt-20 relative overflow-hidden bg-cover bg-center bg-no-repeat transition-opacity duration-500 ease-in-out"
-        style={{ backgroundImage: `url(${settings.backgroundImage})`, opacity: wallpaperReady ? 1 : 0 }}
-    >
-      {/* Background Overlay */}
+    <div className="min-h-screen w-full flex flex-col items-center justify-start pt-20 relative overflow-hidden bg-black">
+      {/* Wallpaper layer — fades in once the image is preloaded */}
       <div
-        className="absolute inset-0 z-0 pointer-events-none transition-all duration-500"
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-700 ease-in-out"
+        style={{ backgroundImage: `url(${settings.backgroundImage})`, opacity: wallpaperReady ? 1 : 0 }}
+      />
+
+      {/* Background Overlay — darkens/blurs the wallpaper; always visible */}
+      <div
+        className="absolute inset-0 z-[1] pointer-events-none transition-all duration-500"
         style={{
             backgroundColor: `rgba(0,0,0,${settings.opacityLevel / 100})`,
             backdropFilter: `blur(${settings.blurLevel}px)`
@@ -316,41 +360,51 @@ const App: React.FC = () => {
 
       {/* Settings Trigger */}
       <button
-        onClick={() => setIsSettingsOpen(true)}
+        onClick={() => { setSettingsEverOpened(true); setIsSettingsOpen(true); }}
         className="fixed bottom-6 right-6 z-40 p-3 bg-white/20 backdrop-blur-md rounded-full text-white/80 hover:bg-white/40 hover:text-white hover:rotate-90 transition-all shadow-lg"
       >
         <SettingsIcon className="w-6 h-6" />
       </button>
 
-      {/* Modals */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onSave={setSettings}
-        onResetDefaults={handleResetSettings}
-        bookmarks={items}
-        currentEngine={currentEngineId}
-        onRestoreBookmarks={handleRestoreBookmarks}
-        onRestoreSettings={handleRestoreSettings}
-      />
+      {/* Modals — lazily loaded; SettingsModal stays mounted after first open to preserve tab/state */}
+      {settingsEverOpened && (
+        <Suspense fallback={null}>
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            settings={settings}
+            onSave={setSettings}
+            onResetDefaults={handleResetSettings}
+            bookmarks={items}
+            currentEngine={currentEngineId}
+            onRestoreBookmarks={handleRestoreBookmarks}
+            onRestoreSettings={handleRestoreSettings}
+          />
+        </Suspense>
+      )}
 
-      <EditItemModal
-        isOpen={!!editItem}
-        onClose={() => setEditItem(null)}
-        item={editItem?.item || null}
-        onSave={handleSaveItem}
-      />
+      {editItem !== null && (
+        <Suspense fallback={null}>
+          <EditItemModal
+            isOpen={true}
+            onClose={() => setEditItem(null)}
+            item={editItem.item}
+            onSave={handleSaveItem}
+          />
+        </Suspense>
+      )}
 
       {openFolder && (
-        <FolderView
-            folder={openFolder}
-            isOpen={!!openFolder}
-            onClose={() => setOpenFolder(null)}
-            onUpdateFolder={handleUpdateFolder}
-            onEditItem={(item) => setEditItem({item})}
-            onRemoveFromFolder={handleRemoveFromFolder}
-        />
+        <Suspense fallback={null}>
+          <FolderView
+              folder={openFolder}
+              isOpen={true}
+              onClose={() => setOpenFolder(null)}
+              onUpdateFolder={handleUpdateFolder}
+              onEditItem={(item) => setEditItem({item})}
+              onRemoveFromFolder={handleRemoveFromFolder}
+          />
+        </Suspense>
       )}
 
       {/* Signature / Footer */}
